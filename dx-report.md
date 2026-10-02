@@ -54,7 +54,9 @@ each item.
 ### Open upstream defects worked around
 
 **A. The compile pass's analysis budget, exhausted, surfaces as a
-misattributed compiler defect.** `test/aless_app_unit_test.aql` (14
+misattributed compiler defect.** (Recorded 2026-10-02 in boru's
+`design/COMPILABLE-SUBSET.md` §5,
+[boru-lang/boru#528](https://github.com/boru-lang/boru/pull/528).) `test/aless_app_unit_test.aql` (14
 headless scenarios driving `Aless.feed` ~100 times) failed after ~60 s
 with
 
@@ -154,7 +156,8 @@ The same nesting inside a fn body compiles (`def f fn [[xs:List] [List]
 *Workaround:* the per-fixture work is a fn (`walk-one`), called from the
 top-level `each` — commented in `test/aless_smoke_test.aql`. The refusal
 string is the one NUR330 records for `Rand.map-from` bodies; this shape
-is not listed there.
+is not listed there. Recorded 2026-10-02 in boru's `design/COMPILABLE-SUBSET.md` §5
+([boru-lang/boru#528](https://github.com/boru-lang/boru/pull/528)).
 
 **D. The live viewer crashed: Tui.run's update ran on the interpreter
 fallback, whose loop bodies lose their scope.** The suites never see
