@@ -16,6 +16,10 @@ BORU_REF=<sha> test/divergence/run.sh                # pin a specific boru commi
 | run | `boru test/<suite>.aql` | exit 0 **and** print `all green` (every aless suite prints it; the smoke suite has no assertions, so a clean run is its pass) |
 | check | `boru check <file>` | report **0 errors**, on every suite **and** every module (`aless.aql` launcher included) |
 
+The suites are an explicit list (`SUITES` in `run.sh`); a
+`test/aless_*_test.aql` file missing from it fails the gate, so a new
+suite cannot go ungated by accident.
+
 The launcher is check-only: running it starts the TUI, which needs a
 terminal — see the PTY smoke in the top-level `README.md`. The gate
 cannot see the live `Tui.run` path, which compiles its callbacks lazily

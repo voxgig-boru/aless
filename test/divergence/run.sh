@@ -127,6 +127,17 @@ for m in $MODULES; do
 done
 echo
 
+# --- every suite on disk is gated -------------------------------------------
+# The old CI loop globbed test/aless_*_test.aql; with an explicit list, a new
+# suite that is not added to SUITES would silently go ungated — fail instead.
+listed=" $(echo $SUITES) "
+for f in test/aless_*_test.aql; do
+  case "$listed" in
+    *" $f "*) ;;
+    *) log "FAIL — $f is not in SUITES (add it to test/divergence/run.sh)"; fail=1 ;;
+  esac
+done
+
 # --- suites: run (compiled) + check -----------------------------------------
 log "suites — boru X must exit 0 (and print \`all green\` where asserted); boru check X must report 0 errors:"
 printf '  %-32s  %-22s  %-12s  %s\n' SUITE RUN CHECK SECS
