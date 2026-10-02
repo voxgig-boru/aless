@@ -262,11 +262,14 @@ decision, for four seeds × 30 runs each (480 inputs, 16 result maps):
 the outputs are byte-identical. So are the result maps of a
 deliberately failing property over six seeds, with max-shrinks 0 and
 with 50. Spellings that did not work: grouping inline,
-`[(r.list-of [r.int 0 999] n)]`, compiles but the inner body loses `r`
-(`undefined word: r`; a known divergence, to be recorded upstream);
+`[(r.list-of [r.int 0 999] n)]`, compiles but the inner body loses `r`:
+the generator raises `undefined word: r`, so the property reports
+`ok: false` where the interpreter generates the lists (an answer
+divergence; not recorded upstream either — neither boru's `NUR.md` nor
+`COMPILABLE-SUBSET.md` lists it);
 grouping only the inner call still declines; and
 `[ [for 14 [(r.int 0 999)]] ]` declines ("body result of unknown
-provenance"). **New
+provenance"). **A second, silent
 divergence, not yet recorded upstream:** inside a fn whose param is the
 random source, `r.list-of` left ungrouped as the body's result compiles
 and runs, but it draws once and repeats that value:
