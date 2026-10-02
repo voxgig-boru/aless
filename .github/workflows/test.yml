@@ -1,16 +1,21 @@
 name: tests
 
-# aless is written in AQL and tracks aql MAIN (the aql:tui stack it needs
-# postdates any tagged build), so CI builds the interpreter from source at
-# main on every run. An upstream regression can therefore break CI
+# aless is written in boru (formerly AQL) and tracks boru MAIN (the boru:tui
+# stack it needs postdates any tagged build), so CI builds the `boru` CLI from
+# source at main on every run. An upstream regression can therefore break CI
 # independently of any change here — the accepted trade-off for riding the
-# latest aql:tui (see README.md / dx-report.md).
+# latest boru:tui (see README.md / dx-report.md).
+#
+# boru main has ONE execution path: `boru X` checks, compiles to bytecode and
+# runs on the VM (no interpreter fallback; `--force-compile` and friends are
+# retired usage errors). The gate itself lives in test/divergence/run.sh — CI
+# only builds boru and hands the binary over (BORU=…).
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
-  # Nightly, so an upstream aql-main regression is caught even without a push.
+  # Nightly, so an upstream boru-main regression is caught even without a push.
   schedule:
     - cron: '0 6 * * *'
 
@@ -21,46 +26,30 @@ jobs:
       - name: Check out aless
         uses: actions/checkout@v4
 
+      - name: Check out boru source (main)
+        uses: actions/checkout@v4
+        with:
+          repository: boru-lang/boru
+          ref: main
+          path: boru-src
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: boru-src/cmd/go/go.mod
 
-      - name: Check out aql source (main)
-        uses: actions/checkout@v4
-        with:
-          repository: aql-lang/aql
-          ref: main
-          path: aql-src
-
-      - name: Build aql (main)
+      - name: Build boru (main)
         run: |
           mkdir -p "$HOME/.local/bin"
-          cd aql-src/cmd/go
-          # GOWORK=off: the aql repo ships a go.work, so disable workspace mode;
-          # GOFLAGS=-mod=mod then builds the standalone clone.
-          GOWORK=off GOFLAGS=-mod=mod go build -o "$HOME/.local/bin/aql" ./aql
+          ref="$(git -C boru-src rev-parse --short HEAD)"
+          cd boru-src/cmd/go
+          # GOWORK=off: the boru repo ships a go.work, so disable workspace
+          # mode; GOFLAGS=-mod=mod then builds the standalone clone.
+          GOWORK=off GOFLAGS=-mod=mod go build \
+            -ldflags "-X github.com/boru-lang/boru/cmd/go.Version=${ref}" \
+            -o "$HOME/.local/bin/boru" ./boru
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/bin/aql" -version
+          "$HOME/.local/bin/boru" -version
 
-      - name: Static check (launcher + modules)
-        run: |
-          for f in aless.aql aless-app.aql aless-fmt.aql aless-doc.aql \
-                   aless-nav.aql aless-tabs.aql aless-view.aql; do
-            echo "== check $f =="
-            aql check "$f"
-          done
-
-      - name: Suites (interpreter)
-        run: |
-          for t in test/aless_*_test.aql; do
-            echo "== $t =="
-            aql "$t"
-          done
-
-      - name: Suites (bytecode — force-compile parity)
-        run: |
-          for t in test/aless_*_test.aql; do
-            echo "== $t =="
-            aql --force-compile "$t"
-          done
+      - name: Gate (every suite compiled + green; every module and suite checks clean)
+        run: BORU="$HOME/.local/bin/boru" test/divergence/run.sh
