@@ -74,13 +74,14 @@ costs a full analysis of the update loop (~9k steps at top level, about
 twice that inside a `Test.test` body, whose stored body is analysed by a
 probe pass and again by the real pass; measured, eight identical
 `_key (a0) "j"` calls cost exactly as much as eight chained ones, so the
-unit memo does not absorb it). The run reaches step 500,001, the analysis is cut
-off (`step_budget_exceeded`, which the compile pass never reports), the
+unit memo does not absorb it). The run reaches step 500,001, the
+analysis is cut off (`step_budget_exceeded`, which the compile pass never reports), the
 truncated carriers make the very next dispatches unmatchable — first
 `def want (AlessDoc.path-key (p))` in `aless-tabs.aql` — and the latch
 records the misleading reason. Evidence: with the constant raised to
 5,000,000 the identical file compiles and runs all green (peak ~1.75M
-steps); there is no CLI knob (`-options steps:N` is the *run* budget).
+steps; ~2.4M with item D's lambdas in the app map); there is no CLI
+knob (`-options steps:N` is the *run* budget).
 The failure is a function of total size, not of any one scenario —
 every scenario compiled alone, and a bisection found some five-scenario
 subsets failing while others passed — and the reported reason is
@@ -101,9 +102,10 @@ lines unchanged; multi-event sequences go through one fold (`_keys st
 and the two common starting states (`_booted`, `_json`) are built once
 at top level (app states are immutable maps). Measured peaks: 330k, 390k
 and 370k steps (with item D's lambdas in the app map) — about a fifth
-of the budget spare in the fullest suite. Remove the split when upstream reports or lifts the
-budget. Repro: the pre-split suite (`git show e218c33~1:test/aless_app_unit_test.aql`)
-under `boru`, against the same file under a build with
+of the budget spare in the fullest suite. Remove the split when
+upstream reports or lifts the budget. Repro: the pre-split suite
+(`git show e218c33~1:test/aless_app_unit_test.aql`, saved under
+`test/` and run from the repo root) under `boru`, against the same file under a build with
 `DefaultCheckStepBudget = 5_000_000`.
 
 **B. Checker false positive: `fold` over `(ev get "mods") otherwise []`.**
@@ -181,10 +183,14 @@ reloaded). Traced with an instrumented build (stack at
    neither the interpreter frame's fn-local defs and params nor (here)
    the defining module's imports.
 
-Whether the compile-time stamp happens depended on the launch (one file
-on the command line went the lazy, compiled way and only crashed on
-narrower shapes). No NUR record covers it; `invokeCallback`'s own
-comment calls the interpreter fallback "slow, never wrong".
+Whether the compile pass leaves that stamp depends on incidental code
+shape: an interim variant of `aless-tabs.aql` (module-local wrappers
+for the `AlessDoc` calls in its fold bodies, and `as-list`-typed fold
+operands) happened to avoid it for a one-file launch — that run showed
+`stamped aless-update` with no position, i.e. the lazy stamp, and
+worked — but not for two files or the welcome tab, so dodging shapes in
+the loop bodies is no fix. No NUR record covers it; `invokeCallback`'s
+own comment calls the interpreter fallback "slow, never wrong".
 
 *Workaround:* the app map hands `Tui.run` lambdas over the module's
 fns — `update: ([st:Map ev:Map] => [aless-update st ev])`, `view:
