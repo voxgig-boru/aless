@@ -73,6 +73,8 @@ log() { echo "[divergence] $*"; }
 # --- locate or build boru -------------------------------------------------
 if [ -n "${BORU:-}" ]; then
   [ -x "$BORU" ] || { echo "error: BORU=$BORU is not an executable." >&2; exit 1; }
+  # absolute, so a relative BORU=./boru survives the `cd "$REPO"` below
+  BORU="$(cd "$(dirname "$BORU")" && pwd)/$(basename "$BORU")"
 else
   BORU_REF="${BORU_REF:-$(git ls-remote https://github.com/boru-lang/boru.git main 2>/dev/null | cut -f1)}"
   [ -n "$BORU_REF" ] || BORU_REF="$(curl -fsSL https://api.github.com/repos/boru-lang/boru/commits/main 2>/dev/null \

@@ -80,8 +80,12 @@ truncated carriers make the very next dispatches unmatchable — first
 `def want (AlessDoc.path-key (p))` in `aless-tabs.aql` — and the latch
 records the misleading reason. Evidence: with the constant raised to
 5,000,000 the identical file compiles and runs all green (peak ~1.75M
-steps; ~2.4M with item D's lambdas in the app map); there is no CLI
-knob (`-options steps:N` is the *run* budget).
+steps; ~2.4M with item D's lambdas in the app map). Re-verified
+2026-10-02 against the current modules: a clean 64c5ab2 build changed
+only in that constant compiles the pre-split suite and prints `all
+green`, though it takes ~12 minutes. Stock 64c5ab2 stops at "code-body
+word test-test (Stage 2)". There is no CLI knob (`-options steps:N` is
+the *run* budget).
 The failure is a function of total size, not of any one scenario —
 every scenario compiled alone, and a bisection found some five-scenario
 subsets failing while others passed — and the reported reason is
