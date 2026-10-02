@@ -204,6 +204,37 @@ navigation, search, yank, help, tab switching, `W`, `r`, `:tab`,
 from another directory. Repro of the crash: run the two-file launch on
 `b29662e`.
 
+### Open upstream defect, not worked around (checked: nothing relies on it)
+
+**E. `Assert.equal` passes zero values of different types as equal.**
+`Assert.equal 0 false`, `Assert.equal "" false` and `Assert.equal 0 ""`
+pass in either order, as do `Assert.equal false none`, `Assert.equal 0
+none` and `Assert.equal "" none`. `Assert.equal none false`,
+`Assert.equal [] none` and `Assert.equal true none` fail. Minimal repro:
+
+```boru
+import "boru:test"
+Test.test "zero-cross-type" [ Assert.equal 0 false ]
+Test.test "zero-vs-none" [ Assert.equal false none ]
+print (Test.fail-count)    # prints 0: both pass
+```
+
+`Assert.equal` (`lang/go/modules/test.go`) calls `ValuesEqual`
+(`core/go/equal.go`), whose own comment says it compares the payloads
+of two values *with the same type*. Nothing checks the types first. No
+NUR record covers it.
+
+Every aless assertion uses the stack form `literal (computed)
+Assert.equal end`. The top of the stack binds first, so the computed
+value is the first parameter. That makes a computed `none` against a
+literal `false`, `0` or `""` fail, as it should, but a computed `0`
+against a literal `false` would still pass. To check that no assertion
+depends on this, every suite was re-run (2026-10-02) with each
+`Assert.equal end` replaced by a helper that first asserts
+`(typeof x) eq (typeof y)`. All 253 assertions ran and passed. No
+workaround was applied. A new assertion against a zero-valued literal
+should keep this defect in mind.
+
 ### Not changed, on purpose
 
 - The welcome tab and the help overlay still say "an aql file viewer":
