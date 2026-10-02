@@ -19,18 +19,28 @@ def _fixtures [
   "bad.json", "lines.txt"
 ]
 
-def _walk (each [ var [[nm]
-  def res (AlessFmt.load `test/fixtures/${nm}` {})
-  def rows (if (res get "ok") [ AlessDoc.top (res get "doc") ] [ [] ])
-  # expand the first expandable child row, then render every visible
-  # row's key and value strings — the per-frame work the viewer does
-  def rows2 (if ((size (rows)) gt 1) [ AlessDoc.expand (res get "doc") (rows) 1 ] [ (rows) ])
-  def lines (each [ var [[rw]
-    `${(AlessDoc.key-str (rw))}=${(AlessDoc.value-str (res get "doc") (rw))}`
-  ]] (rows2))
-  print (`${nm}: kind=${(res get "kind")} rows=${(size (rows2))}`)
-  0
-]] (_fixtures))
+# The per-fixture work lives in a fn rather than inline in the root-level
+# `each` body.
+# works around boru compile defect: "twin regime: a bind transition has no
+# stream placement (a multi-run-body or post-trap twin)" — a var-binding
+# `each` nested inside a root-level `each` body refuses compilation, while
+# the same nesting inside a fn body compiles — remove when fixed upstream.
+def walk-one fn [
+  [nm:String] [Integer] [
+    def res (AlessFmt.load `test/fixtures/${nm}` {})
+    def rows (if (res get "ok") [ AlessDoc.top (res get "doc") ] [ [] ])
+    # expand the first expandable child row, then render every visible
+    # row's key and value strings — the per-frame work the viewer does
+    def rows2 (if ((size (rows)) gt 1) [ AlessDoc.expand (res get "doc") (rows) 1 ] [ (rows) ])
+    def lines (each [ var [[rw]
+      `${(AlessDoc.key-str (rw))}=${(AlessDoc.value-str (res get "doc") (rw))}`
+    ]] (rows2))
+    print (`${nm}: kind=${(res get "kind")} rows=${(size (rows2))}`)
+    0
+  ]
+]
+
+def _walk (each [ var [[nm] walk-one (nm) ]] (_fixtures))
 
 print "--- search sweep over the json fixture ---"
 def _res (AlessFmt.load "test/fixtures/sample.json" {})

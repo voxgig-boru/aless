@@ -232,7 +232,7 @@ def _many (iota 600 each [ var [[i] "match-me" ] ])
 
 # --- summary --------------------------------------------------------
 
-"---" print
-"fail count: " print Test.fail-count end print
-0 Test.fail-count end Assert.equal end
-"all green" print
+print "---"
+print (`fail count: ${(Test.fail-count)}`)
+Assert.equal 0 (Test.fail-count)
+print "all green"
