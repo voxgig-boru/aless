@@ -2,13 +2,13 @@
 # re-anchor).
 #
 # Run from the repo root:
-#   aql test/aless_tabs_unit_test.aql
+#   boru test/aless_tabs_unit_test.aql
 
 
-import "aql:test" end
-import "./aless-doc.aql" end
-import "./aless-nav.aql" end
-import "./aless-tabs.aql" end
+import "boru:test" end
+import "../aless-doc.aql" end
+import "../aless-nav.aql" end
+import "../aless-tabs.aql" end
 
 
 def _vh 5
@@ -162,7 +162,7 @@ def _doc-b2 {a: {x: 5}, e: [10, 20, 30], f: "s"}
 
 # --- summary --------------------------------------------------------
 
-"---" print
-"fail count: " print Test.fail-count end print
-0 Test.fail-count end Assert.equal end
-"all green" print
+print "---"
+print (`fail count: ${(Test.fail-count)}`)
+Assert.equal 0 (Test.fail-count)
+print "all green"

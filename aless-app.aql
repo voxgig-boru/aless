@@ -1,5 +1,5 @@
 # aless: the shell of the aless viewer — the only module that touches the
-# terminal. Elm-style app map over aql:tui's Tui.run (the todo-tui.aql
+# terminal. Elm-style app map over boru:tui's Tui.run (the todo-tui
 # idiom): pure `update` folds events into a state map, pure `view`
 # (aless-view) renders it, and background work (file watchers) arrives as
 # ordinary mailbox messages sent to the registered "tui" process.
@@ -8,11 +8,11 @@
 #   Aless.run {}                                     # welcome tab, :open files
 #   Aless.run {files: ["a.json", "b.csv"]}           # open files (watch ON)
 #   Aless.run {files: ["big.json"], watch: false}    # without auto-reload
-#   Aless.serve {tcp: 9700, token: "s3cret"} …       # remote viewing (aql attach)
+#   Aless.serve {tcp: 9700, token: "s3cret"} …       # remote viewing (boru attach)
 #
-# Files can be passed from a shell via `aql aless.aql <files>` (IO.args)
-# or, on a build without it, `aql -e`:
-#   aql -e 'import "./aless-app.aql"  Aless.run {files: ["test/fixtures/sample.json"]}'
+# Files are passed from a shell via `boru aless.aql <files>` (IO.args),
+# or from a one-liner run from the repo root:
+#   boru -e 'import "./aless-app.aql"  Aless.run {files: ["test/fixtures/sample.json"]}'
 #
 # App state:
 #   { tabs, active, next          the tab set (aless-tabs)
@@ -23,20 +23,18 @@
 #     dim                         {cols rows}
 #     watch-default               new tabs start watching? (default true) }
 #
-# Watch pipeline: IO.watch on the file's PARENT directory with a
-# {match: basename} filter (editors replace files via temp+rename; a
-# dir watch survives that, a file watch dies) → the module-level
-# `notify-change` body sends {tag: "file-changed"} to "tui" → update
-# reloads every watched tab via AlessTabs.reanchor, which retains the
-# view position. IO.watch bodies run later, in a forked runtime: they
-# can only reference MODULE-LEVEL words, never fn locals.
+# Watch pipeline: a spawned metronome sends {tag: "tick"} to "tui" once
+# a second → update compares each watched tab's mtime+size stamp and
+# reloads a changed file via AlessTabs.reanchor, which retains the view
+# position (see "watch plumbing" below for why it polls). A
+# {tag: "file-changed"} message is handled exactly like a tick.
 
 
-import "aql:tui"
-import "aql:io"
-import "aql:time-util"
-import "aql:math-util"
-import "aql:string-util"
+import "boru:tui"
+import "boru:io"
+import "boru:time-util"
+import "boru:math-util"
+import "boru:string-util"
 import "./aless-fmt.aql"
 import "./aless-doc.aql"
 import "./aless-nav.aql"
@@ -72,9 +70,16 @@ def row-at fn [
   [rows:List j:Integer] [Map] [ rows get (j) ]
 ]
 
+# The event's modifier list goes through the typed as-list coercion.
+# works around boru checker false positive: over an event map that lacks
+# "mods" (a synthetic {tag: "key", key: k} from another file),
+# `fold … ((ev get "mods") otherwise []) false` is reported as
+# "no_signature: cannot call `fold` … got (List, Disjunct, Word)" — the
+# None-dropping `otherwise` is left a disjunct; a [List]-typed coercion
+# pins it — remove when fixed upstream.
 def has-ctrl fn [
   [ev:Map] [Boolean] [
-    fold [ var [[m acc] (acc) or ((m) eq "ctrl") ]] ((ev get "mods") otherwise []) false
+    fold [ var [[m acc] (acc) or ((m) eq "ctrl") ]] (as-list (ev get "mods")) false
   ]
 ]
 
@@ -83,12 +88,14 @@ def has-ctrl fn [
 # Watching is POLL-based: a spawned metronome process ticks the app
 # once a second and `update` compares each watched tab's mtime+size
 # stamp against a fresh IO.stat, reloading through AlessTabs.reanchor on
-# change. fsnotify (IO.watch) is NOT used: its callback fork never runs
-# while Tui.run's driver owns the runtime, so events are simply never
-# delivered to a live TUI (headless scripts receive them fine — see the
-# repo dx-report; the metronome + send path is the upstream-supported
-# way for background work to reach the "tui" process). Same-second,
-# same-size edits are invisible to the stamp — an accepted limitation.
+# change. fsnotify (IO.watch) is NOT used: on the AQL build this was
+# written against its callback fork never ran while Tui.run's driver
+# owned the runtime, so events were never delivered to a live TUI
+# (dx-report §2). That no longer reproduces on boru main @ 64c5ab2; the
+# poll stays because it is proven under Tui.run (the metronome + send
+# path is the upstream-supported way for background work to reach the
+# "tui" process). Same-second, same-size edits are invisible to the
+# stamp — an accepted limitation.
 
 # One metronome per app run, spawned from on-init. It must reference
 # only module-level words: it runs in its own process. It dies with the
@@ -424,15 +431,32 @@ def aless-app fn [
     }
     def s1 (fold [ var [[f acc] (AlessTabs.open (acc) (as-str (f)) {}) ]] (files) (s0))
     def s2 (if ((size (s1 get "tabs")) eq 0) [ open-welcome (s1) ] [ (s1) ])
-    def out { init: (s2), update: aless-update/r, view: aless-render/r }
+    # The update and view callbacks are lambdas over the module's fns
+    # rather than the fn values themselves.
+    # works around boru runtime defect: handed `aless-update/v` directly,
+    # Tui.run found the value already carrying the compile pass's stamp
+    # with no runnable program, ran update on the interpreter fallback,
+    # and there every loop body became a detached token body that cannot
+    # see its fn's locals, params or module imports — the live viewer died
+    # with "undefined word: AlessDoc" (aless-tabs reanchor's fold body) on
+    # the first watch tick, a reload or a search (dx-report, "Migration to
+    # boru main", item D). A lambda is stamped lazily at its first
+    # application and runs compiled — remove when fixed upstream.
+    def out {
+      init: (s2),
+      update: ([st:Map ev:Map] => [aless-update st ev]),
+      view: ([st:Map] => [aless-render st])
+    }
     out
   ]
 ]
 
 # Headless driver: fold one event into an app state exactly as Tui.run
 # would. Exists so integration tests can replay key/watch scenarios
-# without a terminal (an /r-parked update fn called from another module
-# cannot resolve this module's private words; a module wrapper can).
+# without a terminal. (It was also the only way in on AQL, where an
+# update fn value applied from another module could not resolve this
+# module's private words; boru resolves a fn value's free words where it
+# was defined.)
 def feed fn [
   [state:Map ev:Map] [Map] [
     aless-update state ev
@@ -453,8 +477,8 @@ def aless-serve fn [
 
 
 export "Aless" {
-  app: aless-app/r
-  feed: feed/r
-  run: aless-run/r
-  serve: aless-serve/r
+  app: aless-app/v
+  feed: feed/v
+  run: aless-run/v
+  serve: aless-serve/v
 }

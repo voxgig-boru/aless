@@ -6,6 +6,24 @@ a reflection on the **experience** of writing AQL; the repo's
 [`dx-report.md`](dx-report.md) is the factual bug catalogue this
 complements.*
 
+> **Status note (2026-10-01).** This is a historical reflection, written
+> against `aql-lang/aql` @ `c1d2a1a` (2026-07-20); it is left as written.
+> AQL has since been renamed **boru** (`boru-lang/boru`; the CLI is
+> `boru`, modules are `boru:*`, `/r` is `/v`), and aless now runs on boru
+> main @ `64c5ab2`. Of the wish-list at the end: #1 (silent `def`
+> binding), #2 (multi-sig dispatch), the `is`-narrowing and
+> fold-accumulator parts of #3, #4 (`describe fold`), #5 (`IO.watch`
+> under `Tui.run`), #6 (`IO.args` / `IO.env`) and #8 (insertion-ordered
+> maps) are done or no longer reproduce; #7 (a boru-reachable virtual
+> terminal) is still open. There is now one execution path — every
+> program is compiled to bytecode or refused — so the compile-or-refuse
+> contract praised below became the only contract. The new sharp edges
+> are the compile pass's fixed analysis budget, and a `Tui.run` callback
+> path that ran on an interpreter fallback whose loop bodies lost their
+> scope — the "green suites, broken app" pattern below, again. Details,
+> with repros, in [`dx-report.md`](dx-report.md) ("Migration to boru
+> main @ 64c5ab2").
+
 ---
 
 ## The short version

@@ -1,0 +1,143 @@
+# aless viewer: headless integration tests for the shell (aless-app.aql)
+# — navigation, tab switching, search, yank.
+#
+# Drives the REAL update loop through Aless.feed — the same fold Tui.run
+# applies to terminal events — with synthetic event maps, so the shell is
+# exercised without a terminal. (boru has no boru-reachable virtual
+# terminal backend; this is the next best surface — only rendering and
+# raw key decoding stay untested here, covered by the PTY smoke in
+# README.md.)
+#
+# The headless app tests are split across three suites —
+#   aless_app_unit_test.aql          boot, command mode, quit, help, render
+#   aless_app_browse_unit_test.aql   navigation, tab switching, search, yank
+#   aless_app_watch_unit_test.aql    the watch-reload pipeline, manual reload
+# — and feed key sequences through one fold (_keys, _line), with the
+# common starting states built once (_booted, _json).
+# works around boru compile defect: the compile pass runs the top level
+# under check-mode analysis with a fixed 500,000-step budget and every
+# Aless.feed costs a full analysis of the update loop (twice inside a
+# Test.test body), so one suite holding all fourteen scenarios exhausted
+# the budget and then failed with the misattributed "[boru/compile_failed]
+# unmatched dispatch recovered at def" (dx-report, "Migration to boru
+# main") — remove the split when fixed upstream.
+#
+# Run from the repo root (the fixtures resolve against the working
+# directory):
+#   boru test/aless_app_browse_unit_test.aql
+
+
+import "boru:test" end
+import "../aless-app.aql" end
+import "../aless-tabs.aql" end
+
+
+# Press one named key.
+def _key fn [
+  [st:Map k:String] [Map] [
+    Aless.feed (st) {tag: "key", key: (k)}
+  ]
+]
+
+# Press named keys in order — one key event each, exactly as successive
+# _key calls, folded through Aless.feed in one pass.
+def _keys fn [
+  [st:Map ks:List] [Map] [
+    fold [ var [[k acc] Aless.feed (acc) {tag: "key", key: (k)} ]] (ks) (st)
+  ]
+]
+
+# Submit one mode line: the lead key (":" or "/"), the text typed one
+# character at a time (as _type), then enter — the same events as
+# `_key (_type (_key st lead) s) "enter"`, folded in one pass.
+def _line fn [
+  [st:Map lead:String s:String] [Map] [
+    def n (size (s))
+    fold [ var [[j acc]
+      def ev (if ((j) eq 0) [ {tag: "key", key: (lead)} ] [
+        if ((j) gt (n)) [ {tag: "key", key: "enter"} ] [
+          def c (slice ((j) sub 1) (j) s)
+          {tag: "key", key: (c), char: (c)}
+        ]
+      ])
+      Aless.feed (acc) (ev)
+    ]] (range 0 ((n) add 2) 1) (st)
+  ]
+]
+
+# Boot an app on the welcome tab at 100x30.
+def _boot fn [
+  [] [Map] [
+    def app (Aless.app {})
+    Aless.feed (app get "init") {tag: "init", cols: 100, rows: 30}
+  ]
+]
+
+# Shared starting states, built once at top level: the booted app on its
+# welcome tab, and the app after `:open test/fixtures/sample.json`. App
+# states are immutable maps, so a test that starts from one sees exactly
+# the state it would rebuild with its own _boot / :open.
+def _booted (_boot)
+def _json (_line (_booted) ":" "open test/fixtures/sample.json")
+
+
+# --- navigation keys reach the active tab ----------------------------
+
+[
+  def st2 (_json)
+  def st3 (_keys (st2) ["j" "l"])
+  def tb (AlessTabs.active (st3))
+  1 (tb get "focus") Assert.equal end
+  true (((tb get "rows") get 1) get "open") Assert.equal end
+  true ((size (tb get "rows")) gt 3) Assert.equal end
+] "nav-reaches-tab" Test.test end
+
+
+# --- tab switching ---------------------------------------------------
+
+[
+  def st (_booted)
+  def st2 (_line (st) ":" "open test/fixtures/sample.csv")
+  1 (st2 get "active") Assert.equal end
+  def st3 (_key (st2) "tab")
+  0 (st3 get "active") Assert.equal end
+  def st4 (_key (st3) "backtab")
+  1 (st4 get "active") Assert.equal end
+  def st5 (_line (st4) ":" "tab 1")
+  0 (st5 get "active") Assert.equal end
+] "tab-switching" Test.test end
+
+
+# --- search + n cycling ---------------------------------------------
+
+[
+  def st2 (_json)
+  def st3 (_line (st2) "/" "title")
+  2 (size (st3 get "matches")) Assert.equal end
+  "[1/2]" (st3 get "msg") Assert.equal end
+  def tb (AlessTabs.active (st3))
+  "title" (((tb get "rows") get (tb get "focus")) get "key") Assert.equal end
+  def st4 (_key (st3) "n")
+  "[2/2]" (st4 get "msg") Assert.equal end
+  def st5 (_key (st4) "n")
+  "[1/2]" (st5 get "msg") Assert.equal end
+  def st6 (_key (st5) "N")
+  "[2/2]" (st6 get "msg") Assert.equal end
+] "search-and-cycle" Test.test end
+
+
+# --- yank prints to the message line --------------------------------
+
+[
+  def st2 (_json)
+  def st3 (_keys (st2) ["j" "y"])
+  ".store = {…} 4 keys" (st3 get "msg") Assert.equal end
+] "yank-to-message" Test.test end
+
+
+# --- summary --------------------------------------------------------
+
+print "---"
+print (`fail count: ${(Test.fail-count)}`)
+Assert.equal 0 (Test.fail-count)
+print "all green"

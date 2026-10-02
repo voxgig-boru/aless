@@ -3,11 +3,11 @@
 # Boolean).
 #
 # Run from the repo root:
-#   aql test/aless_doc_prop_test.aql
+#   boru test/aless_doc_prop_test.aql
 
 
-import "aql:test" end
-import "./aless-doc.aql" end
+import "boru:test" end
+import "../aless-doc.aql" end
 
 
 # A fixture with maps, lists, nesting, and scalars in all positions.
@@ -24,6 +24,17 @@ def _apply fn [
   ]
 ]
 
+# The op-stream generator: `n` draws of `r.int 0 999`, in draw order, from
+# the property's seeded random source `r` — what `[r.list-of [r.int 0 999] n]`
+# generated inline, value for value. It is a named fn so that every
+# generator body compiles: inline, the bare member call declines its compile
+# stamp and runs on the interpreter (boru COMPILABLE-SUBSET §5,
+# boru-lang/boru#528), and grouping it inline, `[(r.list-of [r.int 0 999] n)]`,
+# compiles but loses `r` in the inner body. Keep the parens inside the fn:
+# left bare as the body's result, `r.list-of […] n` compiles but repeats its
+# first draw n times (dx-report, "Migration to boru main", item F).
+def _op-stream fn [[n:Integer r:Map] [List] [ (r.list-of [r.int 0 999] n) ]]
+
 
 # --- P1. Any splice sequence rebuilds exactly -----------------------
 #
@@ -32,16 +43,15 @@ def _apply fn [
 # byte-for-byte. This pins the equivalence of the two row-construction
 # paths (splice vs rebuild) that the reload re-anchor depends on.
 
-Test.check-prop "splice-rebuild-round-trip"
-  [r.list-of [r.int 0 999] 14]
+def _p1 (Test.check-prop "splice-rebuild-round-trip"
+  [ (_op-stream 14 r) ]
   [
     var [[ops]
       def rows (_apply (_pdoc) (ops))
       (AlessDoc.rebuild (_pdoc) (AlessDoc.expanded-of (rows))) deq (rows)
     ]
   ]
-  30 1 0
-end
+  30 1 0)
 
 
 # --- P2. Structural invariants survive any splice sequence ----------
@@ -50,8 +60,8 @@ end
 # equals its path length — a depth/path mismatch is how a bad splice
 # corrupts the tree shape.
 
-Test.check-prop "row-structural-invariants"
-  [r.list-of [r.int 0 999] 14]
+def _p2 (Test.check-prop "row-structural-invariants"
+  [ (_op-stream 14 r) ]
   [
     var [[ops]
       def rows (_apply (_pdoc) (ops))
@@ -61,14 +71,13 @@ Test.check-prop "row-structural-invariants"
       ((size (rows)) gt 0) and (((rows get 0) get "depth") eq 0) and (shape)
     ]
   ]
-  30 2 0
-end
+  30 2 0)
 
 
 # --- P3. expand then collapse at a closed container is identity -----
 
-Test.check-prop "expand-collapse-identity"
-  [r.list-of [r.int 0 999] 8]
+def _p3 (Test.check-prop "expand-collapse-identity"
+  [ (_op-stream 8 r) ]
   [
     var [[ops]
       def rows (_apply (_pdoc) (ops))
@@ -79,14 +88,13 @@ Test.check-prop "expand-collapse-identity"
       ]
     ]
   ]
-  30 3 0
-end
+  30 3 0)
 
 
 # --- P4. subtree-end lands strictly past its row, within bounds -----
 
-Test.check-prop "subtree-end-bounds"
-  [r.list-of [r.int 0 999] 10]
+def _p4 (Test.check-prop "subtree-end-bounds"
+  [ (_op-stream 10 r) ]
   [
     var [[ops]
       def rows (_apply (_pdoc) (ops))
@@ -95,8 +103,7 @@ Test.check-prop "subtree-end-bounds"
       ((e) gt (ix)) and ((e) lte (size (rows)))
     ]
   ]
-  30 4 0
-end
+  30 4 0)
 
 
 # --- summary --------------------------------------------------------
@@ -116,7 +123,7 @@ def _print-results (all-results each [
     0
   ]
 ])
-"---" print
-"fail count: " print Test.fail-count end print
-0 Test.fail-count end Assert.equal end
-"all green" print
+print "---"
+print (`fail count: ${(Test.fail-count)}`)
+Assert.equal 0 (Test.fail-count)
+print "all green"

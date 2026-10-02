@@ -1,11 +1,12 @@
 # aless viewer: unit tests for aless-fmt.aql (format detection + load).
 #
-# Run from the repo root (fixture paths are CWD-relative):
-#   aql test/aless_fmt_unit_test.aql
+# Run from the repo root (fixture paths resolve against the working
+# directory; the imports resolve against this file):
+#   boru test/aless_fmt_unit_test.aql
 
 
-import "aql:test" end
-import "./aless-fmt.aql" end
+import "boru:test" end
+import "../aless-fmt.aql" end
 
 
 # --- kind-of: extension mapping ------------------------------------
@@ -102,7 +103,7 @@ import "./aless-fmt.aql" end
 
 # --- summary --------------------------------------------------------
 
-"---" print
-"fail count: " print Test.fail-count end print
-0 Test.fail-count end Assert.equal end
-"all green" print
+print "---"
+print (`fail count: ${(Test.fail-count)}`)
+Assert.equal 0 (Test.fail-count)
+print "all green"

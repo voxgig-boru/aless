@@ -1,51 +1,85 @@
 # CLAUDE.md
 
 This repository is **`aless`** — a jless-style TUI file viewer for every
-format aql can parse (tabs; watch-reload), written **in AQL** on the
-`aql:tui` stack. Start with **[README.md](README.md)**: what it is, how
-to launch it, the full keymap, the watch semantics, and the module map.
+format boru can parse (tabs; watch-reload), written **in boru** (the
+language formerly called AQL; source files keep the `.aql` extension) on
+the `boru:tui` stack. Start with **[README.md](README.md)**: what it is,
+how to launch it, the full keymap, the watch semantics, and the module
+map.
 
 ## Working on this repository
 
-- **Build aql from main.** aless tracks aql **main**, unpinned — the
-  `aql:tui` stack it needs landed upstream 2026-07-17. Build the
-  interpreter from a source checkout:
+- **Build boru from main.** aless tracks boru **main**, unpinned (last
+  verified against boru main @ `64c5ab2`, 2026-10-01). The CLI binary is
+  `boru`; build it from a boru-lang/boru source checkout:
   ```bash
-  cd <aql-checkout>/cmd/go && go build -o ~/.local/bin/aql ./aql
+  cd <boru-checkout>/cmd/go && go build -o ~/.local/bin/boru ./boru
   ```
-  Note `GOFLAGS=-mod=mod` *fails* inside the aql workspace ("-mod may
-  only be set to readonly or vendor when in workspace mode") — it is only
-  for standalone clones. A SessionStart hook
-  (`.claude/hooks/session-start.sh`) builds aql from main in remote
+  Inside a boru checkout that is all you need (the checkout carries a
+  `go.work`, and `GOFLAGS=-mod=mod` *fails* there — "-mod may only be set
+  to readonly or vendor when in workspace mode"). For a standalone build
+  of an extracted tarball, use `GOWORK=off GOFLAGS=-mod=mod go build …`
+  (what CI, the SessionStart hook and the gate do). A SessionStart hook
+  (`.claude/hooks/session-start.sh`) builds boru from main in remote
   sessions so a fresh session can run the suites.
+- **One execution path.** `boru X` runs a static pre-flight check, then
+  compiles the program to bytecode and runs it on the VM — or fails with
+  `[boru/compile_failed] … this is a compiler defect`. There is no
+  interpreter fallback for a program (a runtime callback without a
+  compiled unit still gets one — dx-report item D), and `--compile` /
+  `--force-compile` / `--no-compile` are retired (usage errors). "A suite
+  runs" therefore means "a suite fully compiles". Never use `-no-check`
+  to get green.
 - **Modules live at the repo root** (no subfolders): `aless.aql` is the
   entry launcher; `aless-app.aql` is the `Tui.run` shell (the only module
   that touches the terminal); `aless-{view,nav,tabs,doc,fmt}.aql` are the
-  pure, terminal-free core. Run everything from the repo root — relative
-  imports (`./aless-doc.aql`) resolve against the working directory.
+  pure, terminal-free core.
+- **Two path anchors.** `import "./x.aql"` resolves against the
+  **importing file's own directory** (for `boru X` and `boru check X`
+  alike), so the suites in `test/` import `"../aless-doc.aql"` and the
+  launcher can be started from anywhere. **Data paths** read or written
+  through IO words (`IO.read`, `IO.write`, `IO.stat` — the fixtures
+  `test/fixtures/…`, a file passed to `:open`) resolve against the
+  **process working directory**, so run the suites from the repo root.
 - **Tests live in `test/`**, named `aless_<subject>_<unit|prop>_test.aql`
-  plus `aless_smoke_test.aql`. Each assertion-bearing suite ends by
-  asserting `Test.fail-count` is `0` and prints `all green`. The pure
-  modules are unit/property tested directly; the shell is driven
-  headlessly through the exported `Aless.feed` fold
-  (`test/aless_app_unit_test.aql`) — there is no AQL-reachable virtual
-  terminal, so rendering and raw key decoding are covered only by the
-  manual PTY smoke in the README.
-- **Before committing**, from the repo root:
+  plus `aless_smoke_test.aql`. Each assertion-bearing suite ends with
+  `Assert.equal 0 (Test.fail-count)` and prints `all green` (write one
+  `print (value)` per statement — postfix `print` chains reorder). The
+  pure modules are unit/property tested directly; the shell is driven
+  headlessly through the exported `Aless.feed` fold (the
+  `test/aless_app*_unit_test.aql` suites) — there is no boru-reachable
+  virtual terminal, so rendering and raw key decoding are covered only by
+  the manual PTY smoke in the README.
+- **Keep each suite under the compile pass's analysis budget.** The
+  compile pass executes a program's top level under check-mode analysis
+  with a fixed 500,000-step budget; a suite that drives the whole update
+  loop many times exceeds it and fails with a misleading
+  `[boru/compile_failed]` reason — `unmatched dispatch recovered at def`,
+  `code-body word test-test (Stage 2)`, whatever trips first over the
+  truncated analysis (dx-report "Migration to boru main", item A). That is why the headless app
+  tests are three files and feed key sequences through one fold
+  (`_keys`, `_line`). Put new app scenarios in the file with headroom, or
+  a new one.
+- **Before committing**, from the repo root, run the gate:
   ```bash
-  for f in aless.aql aless-app.aql aless-fmt.aql aless-doc.aql \
-           aless-nav.aql aless-tabs.aql aless-view.aql; do aql check "$f"; done
-  for t in test/aless_*_test.aql test/aless_smoke_test.aql; do aql "$t"; done
+  BORU=$(command -v boru) test/divergence/run.sh
   ```
-  All modules should `aql check` clean; every suite should print
-  `all green`. The suites also run under `aql --force-compile` (bytecode)
-  byte-identical to the interpreter — keep them compiling.
-- **Known AQL-runtime gotchas** observed while building aless — and the
+  It checks every module (launcher included) and every suite with
+  `boru check` (0 errors) and runs every suite with `boru X` (exit 0 and
+  `all green`). Without `BORU=…` it builds its own boru at main HEAD. CI
+  (`.github/workflows/test.yml`) builds boru from main and runs the same
+  script.
+- **Known boru-runtime gotchas** observed while building aless — and the
   idioms that dodge them — are in [`dx-report.md`](dx-report.md). Read it
-  before changing the state machinery: the deep-call-chain `def`-binding
-  failure (§1), the `IO.watch`-under-`Tui.run` starvation that forces the
-  metronome+poll design (§2), and the multi-sig dispatch degradation (§3)
-  each shaped how these modules are written.
-- **Upstream AQL proposals** raised from this work live in
-  [`proposals/`](proposals/) (RFCs against the aql interpreter, not
-  changes to aless).
+  before changing the state machinery. What still shapes the code is in
+  its "Migration to boru main" section: the compile pass's analysis
+  budget (item A — why the app tests are split), and the live-TUI
+  callback defect (item D — `Aless.app` hands `Tui.run` *lambdas* over
+  `aless-update` / `aless-render`; handing it `aless-update/v` directly
+  crashes the live viewer, which no suite can see, so PTY-smoke any
+  change to the app map). §1–§4 are fixed or no longer reproduce on main;
+  their workarounds (folds, `is`-chains, def-then-return, the metronome
+  poll) stay because they are harmless.
+- **Upstream proposals** raised from this work live in
+  [`proposals/`](proposals/) (RFCs against boru, not changes to aless);
+  each carries a dated status line.

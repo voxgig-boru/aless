@@ -1,26 +1,38 @@
-# aless viewer: headless integration tests for the shell (aless-app.aql).
+# aless viewer: headless integration tests for the shell (aless-app.aql)
+# — boot, command mode, quit, help, render.
 #
 # Drives the REAL update loop through Aless.feed — the same fold Tui.run
-# applies to terminal events — with synthetic event maps, so command
-# mode, tab management, search, and the watch-reload pipeline are all
-# exercised without a terminal. (aql has no AQL-reachable virtual
+# applies to terminal events — with synthetic event maps, so the shell is
+# exercised without a terminal. (boru has no boru-reachable virtual
 # terminal backend; this is the next best surface — only rendering and
 # raw key decoding stay untested here, covered by the PTY smoke in
 # README.md.)
 #
-# Run from the repo root:
-#   aql test/aless_app_unit_test.aql
+# The headless app tests are split across three suites —
+#   aless_app_unit_test.aql          boot, command mode, quit, help, render
+#   aless_app_browse_unit_test.aql   navigation, tab switching, search, yank
+#   aless_app_watch_unit_test.aql    the watch-reload pipeline, manual reload
+# — and feed key sequences through one fold (_keys, _line), with the
+# common starting states built once (_booted, _json).
+# works around boru compile defect: the compile pass runs the top level
+# under check-mode analysis with a fixed 500,000-step budget and every
+# Aless.feed costs a full analysis of the update loop (twice inside a
+# Test.test body), so one suite holding all fourteen scenarios exhausted
+# the budget and then failed with the misattributed "[boru/compile_failed]
+# unmatched dispatch recovered at def" (dx-report, "Migration to boru
+# main") — remove the split when fixed upstream.
+#
+# Run from the repo root (the fixtures resolve against the working
+# directory):
+#   boru test/aless_app_unit_test.aql
 
 
-import "aql:test" end
-import "aql:io" end
-import "aql:string-util" end
-import "./aless-app.aql" end
-import "./aless-tabs.aql" end
-import "./aless-view.aql" end
+import "boru:test" end
+import "boru:string-util" end
+import "../aless-app.aql" end
+import "../aless-tabs.aql" end
+import "../aless-view.aql" end
 
-
-def _tmp-path "test/fixtures/.tmp-aless-app-watch.json"
 
 # Type a string into the app, one key event per character.
 def _type fn [
@@ -32,9 +44,28 @@ def _type fn [
   ]
 ]
 
+# Press one named key.
 def _key fn [
   [st:Map k:String] [Map] [
     Aless.feed (st) {tag: "key", key: (k)}
+  ]
+]
+
+# Submit one mode line: the lead key (":" or "/"), the text typed one
+# character at a time (as _type), then enter — the same events as
+# `_key (_type (_key st lead) s) "enter"`, folded in one pass.
+def _line fn [
+  [st:Map lead:String s:String] [Map] [
+    def n (size (s))
+    fold [ var [[j acc]
+      def ev (if ((j) eq 0) [ {tag: "key", key: (lead)} ] [
+        if ((j) gt (n)) [ {tag: "key", key: "enter"} ] [
+          def c (slice ((j) sub 1) (j) s)
+          {tag: "key", key: (c), char: (c)}
+        ]
+      ])
+      Aless.feed (acc) (ev)
+    ]] (range 0 ((n) add 2) 1) (st)
   ]
 ]
 
@@ -46,11 +77,18 @@ def _boot fn [
   ]
 ]
 
+# Shared starting states, built once at top level: the booted app on its
+# welcome tab, and the app after `:open test/fixtures/sample.json`. App
+# states are immutable maps, so a test that starts from one sees exactly
+# the state it would rebuild with its own _boot / :open.
+def _booted (_boot)
+def _json (_line (_booted) ":" "open test/fixtures/sample.json")
+
 
 # --- boot: welcome tab, browse mode ---------------------------------
 
 [
-  def st (_boot)
+  def st (_booted)
   1 (size (st get "tabs")) Assert.equal end
   "browse" (st get "mode") Assert.equal end
   "(welcome)" ((AlessTabs.active (st)) get "path") Assert.equal end
@@ -60,7 +98,7 @@ def _boot fn [
 # --- command mode: :open loads a tab, watching by default ------------
 
 [
-  def st (_boot)
+  def st (_booted)
   def st2 (_key (st) ":")
   "command" (st2 get "mode") Assert.equal end
   def st3 (_type (st2) "open test/fixtures/sample.json")
@@ -78,160 +116,30 @@ def _boot fn [
 # --- unknown command reports, bad path keeps a tab -------------------
 
 [
-  def st (_boot)
-  def st2 (_key (_type (_key (st) ":") "frobnicate") "enter")
+  def st (_booted)
+  def st2 (_line (st) ":" "frobnicate")
   "unknown command: frobnicate" (st2 get "msg") Assert.equal end
-  def st3 (_key (_type (_key (st2) ":") "open no/such/file.json") "enter")
+  def st3 (_line (st2) ":" "open no/such/file.json")
   2 (size (st3 get "tabs")) Assert.equal end
   # a failed open still watches: the tab reloads if the file appears
   true ((AlessTabs.active (st3)) get "watch") Assert.equal end
 ] "command-errors" Test.test end
 
 
-# --- navigation keys reach the active tab ----------------------------
-
-[
-  def st (_boot)
-  def st2 (_key (_type (_key (st) ":") "open test/fixtures/sample.json") "enter")
-  def st3 (_key (_key (st2) "j") "l")
-  def tb (AlessTabs.active (st3))
-  1 (tb get "focus") Assert.equal end
-  true (((tb get "rows") get 1) get "open") Assert.equal end
-  true ((size (tb get "rows")) gt 3) Assert.equal end
-] "nav-reaches-tab" Test.test end
-
-
-# --- tab switching ---------------------------------------------------
-
-[
-  def st (_boot)
-  def st2 (_key (_type (_key (st) ":") "open test/fixtures/sample.csv") "enter")
-  1 (st2 get "active") Assert.equal end
-  def st3 (_key (st2) "tab")
-  0 (st3 get "active") Assert.equal end
-  def st4 (_key (st3) "backtab")
-  1 (st4 get "active") Assert.equal end
-  def st5 (_key (_type (_key (st4) ":") "tab 1") "enter")
-  0 (st5 get "active") Assert.equal end
-] "tab-switching" Test.test end
-
-
-# --- search + n cycling ---------------------------------------------
-
-[
-  def st (_boot)
-  def st2 (_key (_type (_key (st) ":") "open test/fixtures/sample.json") "enter")
-  def st3 (_key (_type (_key (st2) "/") "title") "enter")
-  2 (size (st3 get "matches")) Assert.equal end
-  "[1/2]" (st3 get "msg") Assert.equal end
-  def tb (AlessTabs.active (st3))
-  "title" (((tb get "rows") get (tb get "focus")) get "key") Assert.equal end
-  def st4 (_key (st3) "n")
-  "[2/2]" (st4 get "msg") Assert.equal end
-  def st5 (_key (st4) "n")
-  "[1/2]" (st5 get "msg") Assert.equal end
-  def st6 (_key (st5) "N")
-  "[2/2]" (st6 get "msg") Assert.equal end
-] "search-and-cycle" Test.test end
-
-
-# --- watch pipeline: on-disk change + file-changed event -------------
-#
-# The real fs write happens between two feeds; the synthetic
-# {tag: "file-changed"} stands in for the IO.watch delivery (the
-# fsnotify hop itself is asynchronous and pinned upstream).
-
-[
-  IO.write (make Pathon (_tmp-path)) "{a: {b: 1}, c: [10, 20]}" end drop
-  def st (_boot)
-  def st2 (_key (_type (_key (st) ":") `open ${_tmp-path} jsonic`) "enter")
-  def tb (AlessTabs.active (st2))
-  true (tb get "watch") Assert.equal end
-  # focus .c, expand it, focus .c[1]
-  def st3 (_key (_key (_key (_key (_key (st2) "j") "J") "l") "j") "j")
-  def tb3 (AlessTabs.active (st3))
-  "c" (((tb3 get "rows") get 2) get "key") Assert.equal end
-  4 (tb3 get "focus") Assert.equal end
-  # change the file on disk, then deliver the change event
-  IO.write (make Pathon (_tmp-path)) "{a: {b: 99}, c: [10, 21]}" end drop
-  def st4 (Aless.feed (st3) {tag: "file-changed", op: "write"})
-  def tb4 (AlessTabs.active (st4))
-  # document reloaded…
-  21 ((((tb4 get "doc") get "c") get 1)) Assert.equal end
-  # …and the view position survived: same focused path, same screen line
-  true ((((tb4 get "rows") get (tb4 get "focus")) get "path") deq ["c", 1]) Assert.equal end
-  ((tb3 get "focus") sub (tb3 get "scroll"))
-    ((tb4 get "focus") sub (tb4 get "scroll")) Assert.equal end
-  true ((tb4 get "err") is None) Assert.equal end
-  1 (tb4 get "gen") Assert.equal end
-] "watch-reload-retains-position" Test.test end
-
-
-# --- watch reload: broken syntax keeps the old view ------------------
-
-[
-  IO.write (make Pathon (_tmp-path)) "{a: 1}" end drop
-  def st (_boot)
-  def st2 (_key (_type (_key (st) ":") `open ${_tmp-path} json`) "enter")
-  def tb2 (AlessTabs.active (st2))
-  # remove the file: reload fails, view survives, tab marked gone
-  IO.remove (make Pathon (_tmp-path)) end drop
-  def st3 (Aless.feed (st2) {tag: "file-changed", op: "remove"})
-  def tb3 (AlessTabs.active (st3))
-  true ((tb3 get "rows") deq (tb2 get "rows")) Assert.equal end
-  false ((tb3 get "err") is None) Assert.equal end
-  true (tb3 get "gone") Assert.equal end
-] "watch-gone-keeps-view" Test.test end
-
-
-# --- W toggles, :watch off stops -------------------------------------
-
-[
-  IO.write (make Pathon (_tmp-path)) "{a: 1}" end drop
-  def st (_boot)
-  def st2 (_key (_type (_key (st) ":") `open ${_tmp-path}`) "enter")
-  true ((AlessTabs.active (st2)) get "watch") Assert.equal end
-  def st3 (_key (st2) "W")
-  false ((AlessTabs.active (st3)) get "watch") Assert.equal end
-  def st4 (_key (st3) "W")
-  true ((AlessTabs.active (st4)) get "watch") Assert.equal end
-  def st5 (_key (_type (_key (st4) ":") "watch off") "enter")
-  false ((AlessTabs.active (st5)) get "watch") Assert.equal end
-  IO.remove (make Pathon (_tmp-path)) end drop
-] "watch-toggles" Test.test end
-
-
 # --- q closes tabs; the last q yields the quit marker ----------------
 
 [
-  def st (_boot)
-  def st2 (_key (_type (_key (st) ":") "open test/fixtures/sample.json") "enter")
+  def st2 (_json)
   def st3 (_key (st2) "q")
   1 (size (st3 get "tabs")) Assert.equal end
   "(welcome)" ((AlessTabs.active (st3)) get "path") Assert.equal end
 ] "q-closes-tab" Test.test end
 
 
-# --- r on the welcome tab is a no-op (no false gone/err) -------------
-#
-# The welcome tab has no file behind it, so a manual reload must not
-# try to load its synthetic "(welcome)" path and falsely mark it gone.
-
-[
-  def st (_boot)
-  def st2 (_key (st) "r")
-  def tb (AlessTabs.active (st2))
-  "(welcome)" (tb get "path") Assert.equal end
-  false (tb get "gone") Assert.equal end
-  true ((tb get "err") is None) Assert.equal end
-  true ((tb get "rows") deq ((AlessTabs.active (st)) get "rows")) Assert.equal end
-] "welcome-reload-noop" Test.test end
-
-
 # --- help overlay ----------------------------------------------------
 
 [
-  def st (_boot)
+  def st (_booted)
   def st2 (_key (st) "?")
   "help" (st2 get "mode") Assert.equal end
   def st3 (_key (st2) "j")
@@ -239,26 +147,16 @@ def _boot fn [
 ] "help-overlay" Test.test end
 
 
-# --- yank prints to the message line --------------------------------
-
-[
-  def st (_boot)
-  def st2 (_key (_type (_key (st) ":") "open test/fixtures/sample.json") "enter")
-  def st3 (_key (_key (st2) "j") "y")
-  ".store = {…} 4 keys" (st3 get "msg") Assert.equal end
-] "yank-to-message" Test.test end
-
-
 # --- the view renders every mode (widget trees are plain data) ------
 
 [
-  def st (_boot)
+  def st (_booted)
   def wb (convert String (canon (AlessView.render (st))))
   true (StringUtil.contains "aql file viewer" (wb)) Assert.equal end
   def wh (convert String (canon (AlessView.render ((st) set mode "help"))))
   true (StringUtil.contains "move focus" (wh)) Assert.equal end
   true (StringUtil.contains "any key returns" (wh)) Assert.equal end
-  def st2 (_key (_type (_key (st) ":") "open test/fixtures/sample.json") "enter")
+  def st2 (_json)
   def wt (convert String (canon (AlessView.render (st2))))
   true (StringUtil.contains "store" (wt)) Assert.equal end
   true (StringUtil.contains "sample.json" (wt)) Assert.equal end
@@ -269,7 +167,7 @@ def _boot fn [
 
 # --- summary --------------------------------------------------------
 
-"---" print
-"fail count: " print Test.fail-count end print
-0 Test.fail-count end Assert.equal end
-"all green" print
+print "---"
+print (`fail count: ${(Test.fail-count)}`)
+Assert.equal 0 (Test.fail-count)
+print "all green"

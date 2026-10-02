@@ -14,9 +14,9 @@
 #   bottom bar  (1 row)   command/search input when active, else hints
 
 
-import "aql:tui"
-import "aql:math-util"
-import "aql:string-util"
+import "boru:tui"
+import "boru:math-util"
+import "boru:string-util"
 import "./aless-doc.aql"
 
 
@@ -200,6 +200,6 @@ def render fn [
 
 
 export "AlessView" {
-  render: render/r
-  row-line: row-line/r
+  render: render/v
+  row-line: row-line/v
 }

@@ -37,7 +37,7 @@
 #      screen line, clamped.
 
 
-import "aql:math-util"
+import "boru:math-util"
 import "./aless-fmt.aql"
 import "./aless-doc.aql"
 
@@ -224,14 +224,14 @@ def reveal fn [
 
 
 export "AlessTabs" {
-  reveal: reveal/r
-  make: mk-tab/r
-  open: open-tab/r
-  close: close-tab/r
-  activate: activate/r
-  next: next-tab/r
-  prev: prev-tab/r
-  active: active-tab/r
-  put-active: put-active/r
-  reanchor: reanchor/r
+  reveal: reveal/v
+  make: mk-tab/v
+  open: open-tab/v
+  close: close-tab/v
+  activate: activate/v
+  next: next-tab/v
+  prev: prev-tab/v
+  active: active-tab/v
+  put-active: put-active/v
+  reanchor: reanchor/v
 }

@@ -12,7 +12,7 @@
 #     open:  Boolean          container currently expanded?
 #     n:     Integer          child count (0 for leaves) }
 #
-# Rows are plain maps (never class instances) because aql re-runs a
+# Rows are plain maps (never class instances) because boru re-runs a
 # module body per import — distinct class identities per importer would
 # break cross-module row exchange.
 #
@@ -40,19 +40,19 @@
 # the whole document; `rebuild` (full walk) is reserved for reload and
 # search jumps.
 #
-# Known deviation (aql Map semantics): aql maps sort their keys, so
-# map children display in sorted-key order, not source order.
+# Map children display in source (insertion) order: boru maps keep
+# insertion order, and IO.read preserves a file's key order.
 
 
-import "aql:string-util"
-import "aql:struct-util"
+import "boru:string-util"
+import "boru:struct-util"
 
 
 # --- node inspection -------------------------------------------------
 #
 # Type dispatch is done with multi-signature fns (a Map overload, a
 # List overload, an Any fallback) rather than `is`-guarded if-chains:
-# aql's checker analyses every branch without narrowing on `is`, so a
+# the checker analysed every branch without narrowing on `is`, so a
 # guarded `get` on a value it types as a disjunct is a check ERROR —
 # overloads keep dispatch statically total.
 
@@ -160,7 +160,7 @@ def kids-of fn [
 ]
 
 # Child rows (all closed) of a container row, in display order — map
-# children in aql's sorted-key order, list children by index.
+# children in source (insertion) order, list children by index.
 def kids fn [
   [doc:Any r:Map] [List] [
     def p (r get "path")
@@ -323,19 +323,19 @@ def search fn [
 
 
 export "AlessDoc" {
-  top: top/r
-  kids: kids/r
-  expand: expand/r
-  collapse: collapse/r
-  subtree-end: subtree-end/r
-  rebuild: rebuild/r
-  expanded-of: expanded-of/r
-  value-at: value-at/r
-  has-path: has-path/r
-  parent: parent/r
-  path-key: path-key/r
-  path-str: path-str/r
-  key-str: key-str/r
-  value-str: value-str/r
-  search: search/r
+  top: top/v
+  kids: kids/v
+  expand: expand/v
+  collapse: collapse/v
+  subtree-end: subtree-end/v
+  rebuild: rebuild/v
+  expanded-of: expanded-of/v
+  value-at: value-at/v
+  has-path: has-path/v
+  parent: parent/v
+  path-key: path-key/v
+  path-str: path-str/v
+  key-str: key-str/v
+  value-str: value-str/v
+  search: search/v
 }

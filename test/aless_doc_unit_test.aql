@@ -1,14 +1,14 @@
 # aless viewer: unit tests for aless-doc.aql (document → row model).
 #
 # Run from the repo root:
-#   aql test/aless_doc_unit_test.aql
+#   boru test/aless_doc_unit_test.aql
 
 
-import "aql:test" end
-import "./aless-doc.aql" end
+import "boru:test" end
+import "../aless-doc.aql" end
 
 
-# Fixture documents, at top level (aql check treats test bodies as
+# Fixture documents, at top level (the checker treated test bodies as
 # opaque; the leading underscore marks body-only defs).
 
 def _doc {name: "ada", tags: ["x", "y"], meta: {age: 36, ok: true}}
@@ -232,7 +232,7 @@ def _many (iota 600 each [ var [[i] "match-me" ] ])
 
 # --- summary --------------------------------------------------------
 
-"---" print
-"fail count: " print Test.fail-count end print
-0 Test.fail-count end Assert.equal end
-"all green" print
+print "---"
+print (`fail count: ${(Test.fail-count)}`)
+Assert.equal 0 (Test.fail-count)
+print "all green"

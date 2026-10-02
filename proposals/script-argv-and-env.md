@@ -2,6 +2,10 @@
 
 **Status:** Draft (an upstream implementation of the argv half is being
 attempted on `aql-lang/aql` branch `claude/aql-file-viewer-tui-4mf69t`).
+**Status update (2026-10-01, boru main @ `64c5ab2`): implemented
+upstream.** AQL is now boru; `IO.args` landed in boru `16266c0a6`
+(2026-07-21, with the CLI plumbing) and `IO.env` / `IO.env-all` in
+`5a2dd554a` (2026-07-29). `boru aless.aql notes.json` opens the file.
 **Target:** `aql-lang/aql` CLI (`cmd/go`) + `aql:io` module.
 **Provenance:** surfaced while building the `aless`
 TUI file viewer; recorded as **§5** of of

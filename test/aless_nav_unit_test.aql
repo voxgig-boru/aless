@@ -1,12 +1,12 @@
 # aless viewer: unit tests for aless-nav.aql (the jless keymap fold).
 #
 # Run from the repo root:
-#   aql test/aless_nav_unit_test.aql
+#   boru test/aless_nav_unit_test.aql
 
 
-import "aql:test" end
-import "./aless-doc.aql" end
-import "./aless-nav.aql" end
+import "boru:test" end
+import "../aless-doc.aql" end
+import "../aless-nav.aql" end
 
 
 def _doc {a: {b: {c: [1, 2]}, d: true}, e: "s", f: [10, 20, 30]}
@@ -215,7 +215,7 @@ def _wide {items: (iota 6000)}
 
 # --- summary --------------------------------------------------------
 
-"---" print
-"fail count: " print Test.fail-count end print
-0 Test.fail-count end Assert.equal end
-"all green" print
+print "---"
+print (`fail count: ${(Test.fail-count)}`)
+Assert.equal 0 (Test.fail-count)
+print "all green"
