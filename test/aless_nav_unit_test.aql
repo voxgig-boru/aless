@@ -1,7 +1,7 @@
 # aless viewer: unit tests for aless-nav.aql (the jless keymap fold).
 #
 # Run from the repo root:
-#   aql test/aless_nav_unit_test.aql
+#   boru test/aless_nav_unit_test.aql
 
 
 import "boru:test" end

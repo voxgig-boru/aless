@@ -3,7 +3,7 @@
 # Boolean).
 #
 # Run from the repo root:
-#   aql test/aless_doc_prop_test.aql
+#   boru test/aless_doc_prop_test.aql
 
 
 import "boru:test" end

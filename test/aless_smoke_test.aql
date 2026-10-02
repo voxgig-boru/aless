@@ -2,8 +2,8 @@
 # renders rows through AlessDoc without an error. No assertions — a clean
 # end-to-end run is the pass.
 #
-# Run from the repo root:
-#   aql test/aless_smoke_test.aql
+# Run from the repo root (the fixtures resolve against the working directory):
+#   boru test/aless_smoke_test.aql
 
 
 import "../aless-fmt.aql" end

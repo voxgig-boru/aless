@@ -2,7 +2,7 @@
 # re-anchor).
 #
 # Run from the repo root:
-#   aql test/aless_tabs_unit_test.aql
+#   boru test/aless_tabs_unit_test.aql
 
 
 import "boru:test" end

@@ -431,7 +431,22 @@ def aless-app fn [
     }
     def s1 (fold [ var [[f acc] (AlessTabs.open (acc) (as-str (f)) {}) ]] (files) (s0))
     def s2 (if ((size (s1 get "tabs")) eq 0) [ open-welcome (s1) ] [ (s1) ])
-    def out { init: (s2), update: aless-update/v, view: aless-render/v }
+    # The update and view callbacks are lambdas over the module's fns
+    # rather than the fn values themselves.
+    # works around boru runtime defect: handed `aless-update/v` directly,
+    # Tui.run found the value already carrying the compile pass's stamp
+    # with no runnable program, ran update on the interpreter fallback,
+    # and there every loop body became a detached token body that cannot
+    # see its fn's locals, params or module imports — the live viewer died
+    # with "undefined word: doc2" on the first watch tick, a reload or a
+    # search (dx-report, "Migration to boru main", item D). A lambda is
+    # stamped lazily at its first application and runs compiled — remove
+    # when fixed upstream.
+    def out {
+      init: (s2),
+      update: ([st:Map ev:Map] => [aless-update st ev]),
+      view: ([st:Map] => [aless-render st])
+    }
     out
   ]
 ]
