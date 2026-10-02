@@ -32,8 +32,9 @@ aless moved from `aql-lang/aql` @ `c1d2a1a` (2026-07-20) to
 renamed AQL → boru on 2026-07-31, and ~1,600 upstream commits landed in
 between. Result: all seven modules (launcher included) `boru check` with
 **0 errors**; all **nine** suites (the headless app suite is now three
-files, below) compile and run green under `boru X`; the launcher renders
-and navigates in a PTY smoke started from another directory. The
+files, below) compile and run green under `boru X`; and the live viewer
+works in PTY sessions (open, navigate, search, tabs, commands, a watched
+file edited on disk) once item D's workaround is in. The
 original catalogue below is kept as history, with a dated status line on
 each item.
 
@@ -45,7 +46,7 @@ each item.
 | `/r` renamed `/v` (ADR-011, 2026-08-19) | every export map and the app map (`update: aless-update/r`) | `/v` throughout |
 | Relative `import` resolves against the **importing file's own directory**, for `boru X` and `boru check X` | suites in `test/` imported `./aless-*.aql` (cwd-relative) | suites import `../aless-*.aql`; the launcher now runs from any directory |
 | — but **IO data paths** (`IO.read` / `IO.write` / `IO.stat` / `IO.remove`) still resolve against the **process working directory** | fixtures `test/fixtures/…` | unchanged: run suites from the repo root (verified — the smoke run from `test/` loads every fixture with `rows=0`); documented in README / CLAUDE.md / the gate |
-| **One execution path** (2026-09-19): `boru X` = pre-flight check + compile to bytecode + run on the VM, or `[boru/compile_failed]`; no interpreter fallback; `--compile` / `--force-compile` / `--no-compile` retired (usage errors) | CI compared `aql X` against `aql --force-compile X` | `test/divergence/run.sh`: every suite runs green compiled, every module and suite checks with 0 errors; CI builds boru and calls it |
+| **One execution path** (2026-09-19): `boru X` = pre-flight check + compile to bytecode + run on the VM, or `[boru/compile_failed]`; no interpreter fallback for a program (a runtime *callback* with no compiled unit still runs on one — item D); `--compile` / `--force-compile` / `--no-compile` retired (usage errors) | CI compared `aql X` against `aql --force-compile X` | `test/divergence/run.sh`: every suite runs green compiled, every module and suite checks with 0 errors; CI builds boru and calls it |
 | Postfix `print` chains reorder (`"a" print` / `"b" print` prints b, a) | the suites' summaries | `print (value)`, one per statement; suites end `Assert.equal 0 (Test.fail-count)` then `print "all green"` |
 | `Test.check-prop` returns a PropertyResult map | the prop suite's bare calls left four maps printed at exit | bound: `def _p1 (Test.check-prop …)` |
 | Maps keep **insertion order**; `IO.read` keeps a file's key order (2026-07-29) | §8 | adapted in `36affe0` before this migration; README / module comments updated now |
@@ -142,6 +143,54 @@ The same nesting inside a fn body compiles (`def f fn [[xs:List] [List]
 top-level `each` — commented in `test/aless_smoke_test.aql`. The refusal
 string is the one NUR330 records for `Rand.map-from` bodies; this shape
 is not listed there.
+
+**D. The live viewer crashed: Tui.run's update ran on the interpreter
+fallback, whose loop bodies lose their scope.** The suites never see
+this (they drive `Aless.feed` inside one whole-program compile); a PTY
+session does. Launched as `boru aless.aql sample.json sample.csv` (or
+from the welcome tab, then `:open`), the viewer died on the first
+metronome tick, on `r`, or on a search with
+
+```
+error: each: element 0: fold: step 0: [boru/undefined_word]: undefined word: AlessDoc
+```
+
+from `AlessTabs.reanchor`'s fold body (variants seen while bisecting:
+`undefined word: doc2` — the fn's own local — and `undefined word: v`
+in `aless-doc` `kids-of`; and `stamp-of`'s `do [IO.stat (make Pathon
+(path))]` silently trapping `undefined word: path`, so every first tick
+reloaded). Traced with an instrumented build (stack at
+`compiler.StampTokenBody`, the ref seen by `eng` `invokeCompiled`):
+
+1. the compile pass stamps the app map's `update: aless-update/v` value
+   (`-compile-report`: `stamped aless-update @ 434:35`), but the
+   `CompiledFnRef` it leaves on the value has no program at run time;
+2. `Tui.run` → `core.InvokeCallbackFn` finds the slot occupied, so the
+   lazy stamp (`LazyStampFnSig`) never runs, `InvokeCompiled` finds no
+   unit, and `invokeCallback` falls back to `CallBoru` — the
+   interpreter;
+3. on the interpreter every `each` / `fold` / `do` body is handed to
+   `InvokeBody` → `vmContext.invokeTokenBody` → `StampTokenBody`, a
+   detached unit "compiled against r's live bindings" — which hold
+   neither the interpreter frame's fn-local defs and params nor (here)
+   the defining module's imports.
+
+Whether the compile-time stamp happens depended on the launch (one file
+on the command line went the lazy, compiled way and only crashed on
+narrower shapes). No NUR record covers it; `invokeCallback`'s own
+comment calls the interpreter fallback "slow, never wrong".
+
+*Workaround:* the app map hands `Tui.run` lambdas over the module's
+fns — `update: ([st:Map ev:Map] => [aless-update st ev])`, `view:
+([st:Map] => [aless-render st])` — which are stamped lazily at their
+first application and run compiled (`-compile-report`: `stamped
+(anonymous fn)`, no `codebody` stamps at all). Verified in PTY
+sessions: two files on the command line with ~40 keys across
+navigation, search, yank, help, tab switching, `W`, `r`, `:tab`,
+`:open`, `:watch off`, `:close` and quit; and the welcome tab →
+`:open` → an on-disk edit reloaded in place → search → quit, launched
+from another directory. Repro of the crash: run the two-file launch on
+`b29662e`.
 
 ### Not changed, on purpose
 

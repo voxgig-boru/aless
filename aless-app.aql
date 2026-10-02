@@ -438,10 +438,10 @@ def aless-app fn [
     # with no runnable program, ran update on the interpreter fallback,
     # and there every loop body became a detached token body that cannot
     # see its fn's locals, params or module imports — the live viewer died
-    # with "undefined word: doc2" on the first watch tick, a reload or a
-    # search (dx-report, "Migration to boru main", item D). A lambda is
-    # stamped lazily at its first application and runs compiled — remove
-    # when fixed upstream.
+    # with "undefined word: AlessDoc" (aless-tabs reanchor's fold body) on
+    # the first watch tick, a reload or a search (dx-report, "Migration to
+    # boru main", item D). A lambda is stamped lazily at its first
+    # application and runs compiled — remove when fixed upstream.
     def out {
       init: (s2),
       update: ([st:Map ev:Map] => [aless-update st ev]),
@@ -453,8 +453,10 @@ def aless-app fn [
 
 # Headless driver: fold one event into an app state exactly as Tui.run
 # would. Exists so integration tests can replay key/watch scenarios
-# without a terminal (an /r-parked update fn called from another module
-# cannot resolve this module's private words; a module wrapper can).
+# without a terminal. (It was also the only way in on AQL, where an
+# update fn value applied from another module could not resolve this
+# module's private words; boru resolves a fn value's free words where it
+# was defined.)
 def feed fn [
   [state:Map ev:Map] [Map] [
     aless-update state ev

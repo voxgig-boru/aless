@@ -158,12 +158,16 @@ including the watch pipeline against real on-disk writes
 covered by a manual PTY smoke:
 
 ```bash
-(sleep 30; printf 'jl'; sleep 2; printf 'qq') \
+(sleep 40; printf 'jl'; sleep 2; printf 'qq') \
   | script -qec "stty cols 130 rows 32; boru aless.aql test/fixtures/sample.json" /dev/null
 ```
 
 (a real terminal is nicer; the sleep covers boru's compile before the
-first frame). The boru-runtime pitfalls this codebase had to design
+first frame). Run it after any change to the app map or the update
+path: under `Tui.run` the callbacks are compiled lazily, apart from the
+whole-program compile the suites get, and a defect only that path hits
+once crashed the live viewer while every suite stayed green (dx-report,
+"Migration to boru main", item D). The boru-runtime pitfalls this codebase had to design
 around — and the idioms that dodge them — are catalogued in
 [`dx-report.md`](dx-report.md), with upstream RFCs in
 [`proposals/`](proposals/).

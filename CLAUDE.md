@@ -68,11 +68,15 @@ map.
   script.
 - **Known boru-runtime gotchas** observed while building aless — and the
   idioms that dodge them — are in [`dx-report.md`](dx-report.md). Read it
-  before changing the state machinery: the `IO.watch`-under-`Tui.run`
-  starvation that forces the metronome+poll design (§2), and the
-  migration section's analysis-budget limit, are the ones that still
-  shape the code; §1/§3/§4 are fixed on main but their workarounds stay
-  (they are harmless and keep the shapes simple).
+  before changing the state machinery. What still shapes the code is in
+  its "Migration to boru main" section: the compile pass's analysis
+  budget (item A — why the app tests are split), and the live-TUI
+  callback defect (item D — `Aless.app` hands `Tui.run` *lambdas* over
+  `aless-update` / `aless-render`; handing it `aless-update/v` directly
+  crashes the live viewer, which no suite can see, so PTY-smoke any
+  change to the app map). §1–§4 are fixed or no longer reproduce on main;
+  their workarounds (folds, `is`-chains, def-then-return, the metronome
+  poll) stay because they are harmless.
 - **Upstream proposals** raised from this work live in
   [`proposals/`](proposals/) (RFCs against boru, not changes to aless);
   each carries a dated status line.

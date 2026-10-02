@@ -17,10 +17,12 @@ complements.*
 > maps) are done or no longer reproduce; #7 (a boru-reachable virtual
 > terminal) is still open. There is now one execution path — every
 > program is compiled to bytecode or refused — so the compile-or-refuse
-> contract praised below became the only contract, and the new sharp
-> edge is the compile pass's fixed analysis budget. Details, with
-> repros, in [`dx-report.md`](dx-report.md) ("Migration to boru main @
-> 64c5ab2").
+> contract praised below became the only contract. The new sharp edges
+> are the compile pass's fixed analysis budget, and a `Tui.run` callback
+> path that ran on an interpreter fallback whose loop bodies lost their
+> scope — the "green suites, broken app" pattern below, again. Details,
+> with repros, in [`dx-report.md`](dx-report.md) ("Migration to boru
+> main @ 64c5ab2").
 
 ---
 
