@@ -83,7 +83,12 @@ records the misleading reason. Evidence: with the constant raised to
 steps); there is no CLI knob (`-options steps:N` is the *run* budget).
 The failure is a function of total size, not of any one scenario —
 every scenario compiled alone, and a bisection found some five-scenario
-subsets failing while others passed. No NUR record covers it.
+subsets failing while others passed — and the reported reason is
+whichever check first trips over the truncated analysis: with the
+current modules the same pre-split file stops at "code-body word
+test-test (Stage 2)" (latched just after "if: else-branch result of
+unknown provenance"), again right after step 500,001. No NUR record
+covers it.
 
 *Workaround (semantics-preserving):* the headless app tests are three
 suites by subject — `aless_app_unit_test.aql` (boot, command mode, quit,

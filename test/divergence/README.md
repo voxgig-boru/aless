@@ -31,10 +31,12 @@ working directory.
 
 ## When a suite fails to compile but checks clean
 
-`[boru/compile_failed] … unmatched dispatch recovered at def` on a suite
-whose `boru check` is clean is most likely the compile pass's fixed
-500,000-step analysis budget running out (an open upstream defect: the
-truncation is reported as that misleading compiler defect, not as
+A `[boru/compile_failed]` on a suite whose `boru check` is clean —
+`unmatched dispatch recovered at def`, `code-body word test-test (Stage
+2)` or another reason that names no real problem in the code — is most
+likely the compile pass's fixed 500,000-step analysis budget running out
+(an open upstream defect: the truncation is reported as whichever
+compile check trips first over the truncated analysis, not as
 `step_budget_exceeded`). The headless app tests are split into three
 suites for this reason — see `dx-report.md`, "Migration to boru main @
 64c5ab2", item A. Move scenarios to a suite with headroom rather than

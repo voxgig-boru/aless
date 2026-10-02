@@ -54,8 +54,9 @@ map.
   compile pass executes a program's top level under check-mode analysis
   with a fixed 500,000-step budget; a suite that drives the whole update
   loop many times exceeds it and fails with a misleading
-  `[boru/compile_failed] … unmatched dispatch recovered at def`
-  (dx-report "Migration to boru main"). That is why the headless app
+  `[boru/compile_failed]` reason — `unmatched dispatch recovered at def`,
+  `code-body word test-test (Stage 2)`, whatever trips first over the
+  truncated analysis (dx-report "Migration to boru main", item A). That is why the headless app
   tests are three files and feed key sequences through one fold
   (`_keys`, `_line`). Put new app scenarios in the file with headroom, or
   a new one.
