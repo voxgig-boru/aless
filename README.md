@@ -120,8 +120,10 @@ deleted file keeps its buffer and marks the tab `✗` (gone) — and comes
 back when the file does. Edits within the same second that also keep
 the byte size identical are invisible to the stamp (accepted
 limitation). Polling is used instead of fsnotify because `IO.watch`
-callbacks are never delivered while `Tui.run` owns the runtime — see
-dx-report §2.
+callbacks were never delivered while `Tui.run` owned the runtime on the
+AQL build aless was written against (dx-report §2). That no longer
+reproduces on boru main @ `64c5ab2`; the poll stays because it is
+proven under `Tui.run`, and moving to `IO.watch` is a feature change.
 
 ## Deviations from jless (v1)
 

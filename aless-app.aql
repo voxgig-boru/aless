@@ -23,13 +23,11 @@
 #     dim                         {cols rows}
 #     watch-default               new tabs start watching? (default true) }
 #
-# Watch pipeline: IO.watch on the file's PARENT directory with a
-# {match: basename} filter (editors replace files via temp+rename; a
-# dir watch survives that, a file watch dies) → the module-level
-# `notify-change` body sends {tag: "file-changed"} to "tui" → update
-# reloads every watched tab via AlessTabs.reanchor, which retains the
-# view position. IO.watch bodies run later, in a forked runtime: they
-# can only reference MODULE-LEVEL words, never fn locals.
+# Watch pipeline: a spawned metronome sends {tag: "tick"} to "tui" once
+# a second → update compares each watched tab's mtime+size stamp and
+# reloads a changed file via AlessTabs.reanchor, which retains the view
+# position (see "watch plumbing" below for why it polls). A
+# {tag: "file-changed"} message is handled exactly like a tick.
 
 
 import "boru:tui"
@@ -90,12 +88,14 @@ def has-ctrl fn [
 # Watching is POLL-based: a spawned metronome process ticks the app
 # once a second and `update` compares each watched tab's mtime+size
 # stamp against a fresh IO.stat, reloading through AlessTabs.reanchor on
-# change. fsnotify (IO.watch) is NOT used: its callback fork never runs
-# while Tui.run's driver owns the runtime, so events are simply never
-# delivered to a live TUI (headless scripts receive them fine — see the
-# repo dx-report; the metronome + send path is the upstream-supported
-# way for background work to reach the "tui" process). Same-second,
-# same-size edits are invisible to the stamp — an accepted limitation.
+# change. fsnotify (IO.watch) is NOT used: on the AQL build this was
+# written against its callback fork never ran while Tui.run's driver
+# owned the runtime, so events were never delivered to a live TUI
+# (dx-report §2). That no longer reproduces on boru main @ 64c5ab2; the
+# poll stays because it is proven under Tui.run (the metronome + send
+# path is the upstream-supported way for background work to reach the
+# "tui" process). Same-second, same-size edits are invisible to the
+# stamp — an accepted limitation.
 
 # One metronome per app run, spawned from on-init. It must reference
 # only module-level words: it runs in its own process. It dies with the
