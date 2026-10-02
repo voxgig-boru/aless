@@ -242,6 +242,48 @@ depends on this, every suite was re-run (2026-10-02) with each
 workaround was applied. A new assertion against a zero-valued literal
 should keep this defect in mind.
 
+### Property generators compiled (2026-10-02)
+
+**F. `Test.check-prop` generator bodies ran on the interpreter.** Every
+suite compiled as a program, but `boru -compile-report
+test/aless_doc_prop_test.aql` listed **4** runtime callbacks that "did
+not compile": the generator bodies `[r.list-of [r.int 0 999] n]` at
+36:3, 53:3, 69:3 and 86:3, each with "closure storedfn$body: unapplied
+fn-value in body residual (dynamic apply not lowered)" — the
+property-generator shape recorded in boru's `design/COMPILABLE-SUBSET.md`
+§5 ([boru-lang/boru#528](https://github.com/boru-lang/boru/pull/528)).
+They answered correctly on the interpreter. *Rewrite:* the four
+generators now call one named fn, `[ (_op-stream n r) ]`, defined as
+`def _op-stream fn [[n:Integer r:Map] [List] [ (r.list-of [r.int 0 999] n) ]]`.
+After the rewrite, **0** decline. Runs, seeds and max-shrinks are
+unchanged. A scratch harness ran the old and new generators through the
+suite's own four property bodies, printing every input and every
+decision, for four seeds × 30 runs each (480 inputs, 16 result maps):
+the outputs are byte-identical. So are the result maps of a
+deliberately failing property over six seeds, with max-shrinks 0 and
+with 50. Spellings that did not work: grouping inline,
+`[(r.list-of [r.int 0 999] n)]`, compiles but the inner body loses `r`
+(`undefined word: r`; a known divergence, to be recorded upstream);
+grouping only the inner call still declines; and
+`[ [for 14 [(r.int 0 999)]] ]` declines ("body result of unknown
+provenance"). **New
+divergence, not yet recorded upstream:** inside a fn whose param is the
+random source, `r.list-of` left ungrouped as the body's result compiles
+and runs, but it draws once and repeats that value:
+
+```boru
+import "boru:rand"
+def g fn [[r:Map] [List] [ r.list-of [r.int 0 999] 4 ]]
+print (g (Rand.with-seed 7))   # interpreter [550, 417, 502, 54]; compiled [550, 550, 550, 550]
+```
+
+The same happens with `[r.float]`, with `r:Any` and with a trailing
+`end`. Grouping the call, binding it first (`def xs (r.list-of …) xs`)
+or reading a top-level `r` instead of a param all agree with the
+interpreter. Under `check-prop` the repeated lists still pass every
+property, so only a value-level diff shows the bug. That is why
+`_op-stream` keeps its parens.
+
 ### Not changed, on purpose
 
 - The welcome tab and the help overlay still say "an aql file viewer":

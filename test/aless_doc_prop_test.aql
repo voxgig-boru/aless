@@ -24,6 +24,17 @@ def _apply fn [
   ]
 ]
 
+# The op-stream generator: `n` draws of `r.int 0 999`, in draw order, from
+# the property's seeded random source `r` — what `[r.list-of [r.int 0 999] n]`
+# generated inline, value for value. It is a named fn so that every
+# generator body compiles: inline, the bare member call declines its compile
+# stamp and runs on the interpreter (boru COMPILABLE-SUBSET §5,
+# boru-lang/boru#528), and grouping it inline, `[(r.list-of [r.int 0 999] n)]`,
+# compiles but loses `r` in the inner body. Keep the parens inside the fn:
+# left bare as the body's result, `r.list-of […] n` compiles but repeats its
+# first draw n times (dx-report, "Migration to boru main", item F).
+def _op-stream fn [[n:Integer r:Map] [List] [ (r.list-of [r.int 0 999] n) ]]
+
 
 # --- P1. Any splice sequence rebuilds exactly -----------------------
 #
@@ -33,7 +44,7 @@ def _apply fn [
 # paths (splice vs rebuild) that the reload re-anchor depends on.
 
 def _p1 (Test.check-prop "splice-rebuild-round-trip"
-  [r.list-of [r.int 0 999] 14]
+  [ (_op-stream 14 r) ]
   [
     var [[ops]
       def rows (_apply (_pdoc) (ops))
@@ -50,7 +61,7 @@ def _p1 (Test.check-prop "splice-rebuild-round-trip"
 # corrupts the tree shape.
 
 def _p2 (Test.check-prop "row-structural-invariants"
-  [r.list-of [r.int 0 999] 14]
+  [ (_op-stream 14 r) ]
   [
     var [[ops]
       def rows (_apply (_pdoc) (ops))
@@ -66,7 +77,7 @@ def _p2 (Test.check-prop "row-structural-invariants"
 # --- P3. expand then collapse at a closed container is identity -----
 
 def _p3 (Test.check-prop "expand-collapse-identity"
-  [r.list-of [r.int 0 999] 8]
+  [ (_op-stream 8 r) ]
   [
     var [[ops]
       def rows (_apply (_pdoc) (ops))
@@ -83,7 +94,7 @@ def _p3 (Test.check-prop "expand-collapse-identity"
 # --- P4. subtree-end lands strictly past its row, within bounds -----
 
 def _p4 (Test.check-prop "subtree-end-bounds"
-  [r.list-of [r.int 0 999] 10]
+  [ (_op-stream 10 r) ]
   [
     var [[ops]
       def rows (_apply (_pdoc) (ops))
