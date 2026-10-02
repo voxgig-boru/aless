@@ -1,6 +1,13 @@
 # AQL Proposal: Live IO Under Tui.run, and TUI Testability from AQL
 
 **Status:** Draft.
+**Status update (2026-10-01, boru main @ `64c5ab2`):** §1 **no longer
+reproduces** — a PTY probe whose `Tui.run` init registers an
+`IO.watch` saw the callback fire and its `send` reach `update` (see
+dx-report §2); aless still polls. §2 is **still open**: `Tui.open` uses
+the host-registered backend only, and the virtual backend remains
+Go-side. §3 was not re-surveyed. (AQL is now boru: `aql:tui` →
+`boru:tui`.)
 **Target:** `aql-lang/aql` — `aql:tui` runtime + `aql:io` watch.
 **Provenance:** surfaced while building the `aless`
 TUI file viewer; recorded as **§2** and "worth keeping" notes in the

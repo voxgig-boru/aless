@@ -1,5 +1,10 @@
 # Developer-experience report: `aless` on AQL
 
+> **Now verified against boru main @ `64c5ab2` (2026-10-01)** — see
+> [Migration to boru main @ 64c5ab2](#migration-to-boru-main--64c5ab2-2026-10-01).
+> Everything below that section is the original report, with dated
+> status lines.
+
 **AQL build under test:** `aql-lang/aql` @ `c1d2a1a` (main, 2026-07-20),
 built from source in-workspace (`cd cmd/go && go build ./aql`; note
 `GOFLAGS=-mod=mod` now *fails* inside the aql workspace — "-mod may only
@@ -17,6 +22,138 @@ on this build.
 
 Severity: **🔴 high** (silent wrong results / crash / blocks a use case) ·
 **🟡 medium** (friction, clear workaround) · **🟢 low** (papercut).
+
+---
+
+## Migration to boru main @ 64c5ab2 (2026-10-01)
+
+aless moved from `aql-lang/aql` @ `c1d2a1a` (2026-07-20) to
+`boru-lang/boru` **main @ `64c5ab2`** (2026-09-30) — the language was
+renamed AQL → boru on 2026-07-31, and ~1,600 upstream commits landed in
+between. Result: all seven modules (launcher included) `boru check` with
+**0 errors**; all **nine** suites (the headless app suite is now three
+files, below) compile and run green under `boru X`; the launcher renders
+and navigates in a PTY smoke started from another directory. The
+original catalogue below is kept as history, with a dated status line on
+each item.
+
+### Breaking changes hit
+
+| Change (upstream) | Effect on aless | Migration |
+|---|---|---|
+| Rename AQL → boru: the CLI is `boru` (built from `cmd/go` → `./boru`), native modules are `boru:*`, the build-artifact dir is `.boru/` | every `import "aql:…"`; CI, hook and docs built and ran `./aql` | `boru:tui`, `boru:io`, `boru:time-util`, `boru:math-util`, `boru:string-util`, `boru:struct-util`, `boru:test`; tooling builds `cmd/go` → `./boru` (`GOWORK=off GOFLAGS=-mod=mod` for a standalone tarball; inside a checkout plain `go build`, since `-mod=mod` fails in workspace mode) |
+| `/r` renamed `/v` (ADR-011, 2026-08-19) | every export map and the app map (`update: aless-update/r`) | `/v` throughout |
+| Relative `import` resolves against the **importing file's own directory**, for `boru X` and `boru check X` | suites in `test/` imported `./aless-*.aql` (cwd-relative) | suites import `../aless-*.aql`; the launcher now runs from any directory |
+| — but **IO data paths** (`IO.read` / `IO.write` / `IO.stat` / `IO.remove`) still resolve against the **process working directory** | fixtures `test/fixtures/…` | unchanged: run suites from the repo root (verified — the smoke run from `test/` loads every fixture with `rows=0`); documented in README / CLAUDE.md / the gate |
+| **One execution path** (2026-09-19): `boru X` = pre-flight check + compile to bytecode + run on the VM, or `[boru/compile_failed]`; no interpreter fallback; `--compile` / `--force-compile` / `--no-compile` retired (usage errors) | CI compared `aql X` against `aql --force-compile X` | `test/divergence/run.sh`: every suite runs green compiled, every module and suite checks with 0 errors; CI builds boru and calls it |
+| Postfix `print` chains reorder (`"a" print` / `"b" print` prints b, a) | the suites' summaries | `print (value)`, one per statement; suites end `Assert.equal 0 (Test.fail-count)` then `print "all green"` |
+| `Test.check-prop` returns a PropertyResult map | the prop suite's bare calls left four maps printed at exit | bound: `def _p1 (Test.check-prop …)` |
+| Maps keep **insertion order**; `IO.read` keeps a file's key order (2026-07-29) | §8 | adapted in `36affe0` before this migration; README / module comments updated now |
+
+### Open upstream defects worked around
+
+**A. The compile pass's analysis budget, exhausted, surfaces as a
+misattributed compiler defect.** `test/aless_app_unit_test.aql` (14
+headless scenarios driving `Aless.feed` ~100 times) failed after ~60 s
+with
+
+```
+error: [boru/compile_failed]: bytecode compilation FAILED: unmatched dispatch recovered at def — this is a compiler defect, not a policy: valid code must compile.
+  --> source position unknown
+```
+
+while `boru check` on the same file was clean in 2 s. Root cause,
+established with an instrumented build (counters in
+`core/go/analysis_hooks.go` `analysisStepMeter` and the three
+`MarkUncompilable("unmatched dispatch recovered at …")` sites in
+`check/go/check_recovery.go`): the compile pass executes the program's
+top level under check-mode analysis, metered by
+`core.DefaultCheckStepBudget = 500_000`, and every `Aless.feed` call
+costs a full analysis of the update loop (~9k steps at top level, about
+twice that inside a `Test.test` body, whose stored body is analysed by a
+probe pass and again by the real pass; measured, eight identical
+`_key (a0) "j"` calls cost exactly as much as eight chained ones, so the
+unit memo does not absorb it). The run reaches step 500,001, the analysis is cut
+off (`step_budget_exceeded`, which the compile pass never reports), the
+truncated carriers make the very next dispatches unmatchable — first
+`def want (AlessDoc.path-key (p))` in `aless-tabs.aql` — and the latch
+records the misleading reason. Evidence: with the constant raised to
+5,000,000 the identical file compiles and runs all green (peak ~1.75M
+steps); there is no CLI knob (`-options steps:N` is the *run* budget).
+The failure is a function of total size, not of any one scenario —
+every scenario compiled alone, and a bisection found some five-scenario
+subsets failing while others passed. No NUR record covers it.
+
+*Workaround (semantics-preserving):* the headless app tests are three
+suites by subject — `aless_app_unit_test.aql` (boot, command mode, quit,
+help, render), `aless_app_browse_unit_test.aql` (navigation, tab
+switching, search, yank) and `aless_app_watch_unit_test.aql` (watch
+pipeline, manual reload) — with all 14 test names and all 56 assertion
+lines unchanged; multi-event sequences go through one fold (`_keys st
+["j" "J" "l"]`, `_line st ":" "open …"` — the same events as the nested
+`_key`/`_type` calls, analysed once per call instead of once per event);
+and the two common starting states (`_booted`, `_json`) are built once
+at top level (app states are immutable maps). Measured peaks: 300k, 360k
+and 350k steps. Remove the split when upstream reports or lifts the
+budget. Repro: the pre-split suite (`git show e218c33~1:test/aless_app_unit_test.aql`)
+under `boru`, against the same file under a build with
+`DefaultCheckStepBudget = 5_000_000`.
+
+**B. Checker false positive: `fold` over `(ev get "mods") otherwise []`.**
+Once another *file* calls the update loop with a key event that has no
+`mods` key, the analysis of `has-ctrl` (`aless-app.aql`, `aless-nav.aql`)
+reports `no_signature: cannot call 'fold' … got (List, Disjunct, Word)`
+— the None-dropping `otherwise []` is left a disjunct — and the
+pre-flight check blocks the run. Whether it fires depended on the order
+the caller's helpers were defined in. Minimal repro (two files; a single
+file does not trigger it):
+
+```boru
+# m.boru
+def has-ctrl fn [
+  [ev:Map] [Boolean] [
+    fold [ var [[m acc] (acc) or ((m) eq "ctrl") ]] ((ev get "mods") otherwise []) false
+  ]
+]
+def feed fn [[st:Map ev:Map] [Map] [ if (has-ctrl ev) [ (st) set c true ] [ (st) ] ]]
+export "M" { feed: feed/v }
+
+# main.boru — boru check: 1 error (no_signature at m.boru 3:5)
+import "./m.boru"
+def press fn [[st:Map k:String] [Map] [ M.feed (st) {tag: "key", key: (k)} ]]
+print (press {} "j")
+```
+
+*Workaround:* `has-ctrl` reads the list through the module's existing
+typed coercion, `(as-list (ev get "mods"))` (a `[List]`-returning fn),
+which the checker accepts — commented at both sites. Unrecorded upstream.
+
+**C. `twin regime: a bind transition has no stream placement` — a
+var-binding `each` nested in a top-level var-binding `each` body.** The
+smoke suite's fixture walk refused compilation. Minimal repro:
+
+```boru
+print (each [ var [[n] (each [ var [[m] m ]] [1]) ]] [1])
+```
+
+The same nesting inside a fn body compiles (`def f fn [[xs:List] [List]
+[ each [ var [[n] (each [ var [[m] m ]] [1]) ]] (xs) ]]` → `[[1]]`).
+*Workaround:* the per-fixture work is a fn (`walk-one`), called from the
+top-level `each` — commented in `test/aless_smoke_test.aql`. The refusal
+string is the one NUR330 records for `Rand.map-from` bodies; this shape
+is not listed there.
+
+### Not changed, on purpose
+
+- The welcome tab and the help overlay still say "an aql file viewer":
+  user-visible product text, asserted by the app suite; renaming it is a
+  product decision, not a migration step.
+- The workarounds for §1, §3 and §4 stay: their upstream fixes are on
+  main, but the fold / `is`-chain / def-then-return shapes are simple and
+  correct either way.
+- The watch stays poll-based although §2 no longer reproduces: the
+  metronome is proven under `Tui.run`, and switching to `IO.watch` is a
+  feature change, not a migration.
 
 ---
 
@@ -84,6 +221,10 @@ this viewer also runs on stock aql main, where the fix has yet to merge —
 they dispatch correctly either way. (Pre-fix shapes are in this repo's git history,
 `aless-app.aql`/`aless-tabs.aql` before 7c6f739.)
 
+> **Status on boru main @ `64c5ab2` (2026-10-01): fixed.** The minimal
+> repro prints `1`; there is no interpreter path any more.
+
+
 ### 2. 🔴 `IO.watch` callbacks are never delivered while `Tui.run` runs
 
 A watch registered from inside a `Tui.run` update never fires its body:
@@ -107,6 +248,15 @@ while the loop is parked, `aql:tui` + `IO.watch` currently cannot be
 combined. **Workaround (shipped):** a spawned metronome process
 (`spawn` + `TimeUtil.sleep` + `send {tag:"tick"} "tui"` — this path
 works perfectly) with mtime+size polling in `update`.
+
+> **Status on boru main @ `64c5ab2` (2026-10-01): no longer reproduces.**
+> A PTY probe — a `Tui.run` app whose `init` arm registers
+> `IO.watch (make Pathon ".") [fire] {match: "w.json"}`, with `fire`
+> writing a marker file and `send {tag: "hit"} "tui"`, then quitting on
+> `hit` — fired, delivered the message and quit on its own when
+> `w.json` was written from outside. aless keeps the metronome + poll
+> design (it works, and changing it is a feature change).
+
 
 ### 3. 🔴 User multi-signature fn dispatch loses a value's concrete type
 
@@ -149,6 +299,10 @@ a leaf the Any arm, on both surfaces). The `is`-chain workaround above is
 retained because this viewer also runs on stock aql main, where the fix
 has yet to merge — it dispatches correctly either way.
 
+> **Status on boru main @ `64c5ab2` (2026-10-01): fixed.** The repro
+> prints `map` and `["map"]`.
+
+
 ### 4. 🟡 A map literal returned from an fn body evaluates after teardown
 
 `fn [[a:Integer b:Integer] [Map] [ {x: (b)} ]]` raises
@@ -156,6 +310,10 @@ has yet to merge — it dispatches correctly either way.
 values evaluate only after the call's params are gone (body-local defs
 survive; params do not). **Workaround:** bind first — `def out {x:
 (b)} out`. Used everywhere in the modules.
+
+> **Status on boru main @ `64c5ab2` (2026-10-01): fixed.** The repro
+> prints `{"x": 2}`.
+
 
 ### 5. 🟡 No script argv (and no env access)
 
@@ -167,6 +325,11 @@ or an `aql -e 'import … Aless.run {files:[…]}'` one-liner. RFC:
 `proposals/script-argv-and-env.md` (an `IO.args` word + CLI plumbing;
 the launcher already reads it behind a `do/error` feature-detect, so a
 build that carries it accepts `aql aless.aql notes.json`).
+
+> **Status on boru main @ `64c5ab2` (2026-10-01): implemented upstream.**
+> `IO.args` (boru `16266c0a6`, 2026-07-21) and `IO.env` / `IO.env-all`
+> (`5a2dd554a`, 2026-07-29). `boru aless.aql notes.json` opens the file.
+
 
 ### 6. 🟡 Checker friction: several false-error shapes gate execution
 
@@ -193,6 +356,16 @@ parentheses; all shipped):
   the mismatch — `aql check aless-nav.aql` now resolves its siblings —
   so the whole tree checks clean file-by-file from the root.
 
+> **Status on boru main @ `64c5ab2` (2026-10-01):** an `is`-guarded `get`
+> narrows (`if (v is Map) [ (v) get "a" ]` checks and runs); a Map-shaped
+> fold accumulator checks; `convert String` of an `Any` and an `Any` name
+> inside `${…}` both work; a String path to `IO.read` is now a plain
+> `call to 'read' matched no signature` (still needs `make Pathon`).
+> Imports resolve against the importing file for scripts too (migration
+> section), so the CWD/sibling mismatch is gone. One new false positive
+> is recorded in the migration section (B).
+
+
 ### 7. 🟡 `fold`'s var binding order contradicts its description
 
 `describe fold` says "the accumulator is pushed first", and the older
@@ -206,11 +379,22 @@ print (fold [ var [[a b] (a) ]] ["elem"] "init")   # elem — a is the ELEMENT
 Commutative folds (`add`) mask the swap; anything asymmetric silently
 computes garbage. Every fold in this repo reads `var [[elem acc]]`.
 
+> **Status on boru main @ `64c5ab2` (2026-10-01): documented.**
+> `describe fold` now says the accumulator is pushed first and the
+> ELEMENT sits on top, so `var [[a b]]` binds the element to `a` — what
+> this repo assumed.
+
+
 ### 8. 🟢 Map key order is always sorted
 
 `{b:1, a:2}` stores, prints, and iterates as `a, b` — source order is
 unrecoverable, so a JSON viewer cannot show keys in file order (jless
 does). Documented as a viewer deviation.
+
+> **Status (2026-07-29, re-verified on boru main @ `64c5ab2`):
+> resolved.** Maps keep insertion order and `IO.read` keeps a file's key
+> order; aless shows fields in source order (adapted in `36affe0`).
+
 
 ### 9. 🟢 jsonic-family leniency swallows truncation
 
@@ -218,6 +402,9 @@ does). Documented as a viewer deviation.
 `json`/`jsonic` paths — a malformed file "loads fine" with partial
 content. There is no strict mode on the `IO.read` formats. The viewer
 surfaces only hard read/parse errors.
+
+> **Status on boru main @ `64c5ab2` (2026-10-01): unchanged** — the
+> truncated `{"a": 1, "b": ` still reads as `{"a": 1, "b": null}`.
 
 ## What worked well (worth keeping)
 
@@ -274,16 +461,24 @@ where the fix has yet to merge. Pinned upstream by
 `lang/go/bytecode_ifbranch_operand_test.go` and the
 `design/COMPILABLE-SUBSET.md` §2 branch-join narrow-preservation note.
 
+> **Status on boru main @ `64c5ab2` (2026-10-01):** `--force-compile`
+> and the interpreter are gone — every program is compiled or refused —
+> so "byte-identical to the interpreter" is no longer a thing to check;
+> the gate is that every suite compiles and runs green. Getting there
+> needed the three workarounds in the migration section.
+
 ## Summary
 
-| # | Severity | Issue | Status |
-|---|----------|-------|--------|
-| 1 | 🔴 | silent `def`-binding failure in deep call chains (alias fns, recursion) | **root-caused & fixed** on the tracked aql branch (TCO × forward-paren-group, interpreter-only); fold/direct workaround retained for stock main |
-| 2 | 🔴 | `IO.watch` callbacks starved under `Tui.run` | open; metronome+poll workaround |
-| 3 | 🔴 | multi-sig dispatch degrades through Any params in each/cross-module chains | **fixed** on the tracked aql branch (bytecode strict-Any re-dispatch); is-chain workaround retained for stock main |
-| 4 | 🟡 | returned map literal evaluates after param teardown | open; def-then-return |
-| 5 | 🟡 | no script argv / env access | open; RFC filed, launcher feature-detects |
-| 6 | 🟡 | checker false-error shapes gate `aql X` | open; typed-helper idioms |
-| 7 | 🟡 | fold var order contradicts docs | open; element-first idiom |
-| 8 | 🟢 | map keys always sorted | by design; documented deviation |
-| 9 | 🟢 | lenient parsing swallows truncation | by design; documented |
+(Status column as of the AQL build; the last column is boru main @ `64c5ab2`, 2026-10-01.)
+
+| # | Severity | Issue | Status | main @ 64c5ab2 |
+|---|----------|-------|--------|---|
+| 1 | 🔴 | silent `def`-binding failure in deep call chains (alias fns, recursion) | **root-caused & fixed** on the tracked aql branch (TCO × forward-paren-group, interpreter-only); fold/direct workaround retained for stock main | fixed |
+| 2 | 🔴 | `IO.watch` callbacks starved under `Tui.run` | open; metronome+poll workaround | no longer reproduces; poll kept |
+| 3 | 🔴 | multi-sig dispatch degrades through Any params in each/cross-module chains | **fixed** on the tracked aql branch (bytecode strict-Any re-dispatch); is-chain workaround retained for stock main | fixed |
+| 4 | 🟡 | returned map literal evaluates after param teardown | open; def-then-return | fixed |
+| 5 | 🟡 | no script argv / env access | open; RFC filed, launcher feature-detects | `IO.args` / `IO.env` landed |
+| 6 | 🟡 | checker false-error shapes gate `aql X` | open; typed-helper idioms | mostly fixed; new FP (migration B) |
+| 7 | 🟡 | fold var order contradicts docs | open; element-first idiom | documented |
+| 8 | 🟢 | map keys always sorted | by design; documented deviation | insertion order |
+| 9 | 🟢 | lenient parsing swallows truncation | by design; documented | unchanged |

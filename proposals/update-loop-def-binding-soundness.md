@@ -1,6 +1,10 @@
 # AQL Proposal: Def-Binding and Dispatch Soundness in Deep Call Chains
 
 **Status:** Draft — this is primarily a bug report with repros; the
+**Status update (2026-10-01, boru main @ `64c5ab2`): all three fixed
+upstream.** §1's repro binds (`1`), §2's prints `["map"]`, §3's prints
+`{"x": 2}` (dx-report §1, §3, §4). AQL is now boru, with a single
+compiled execution path.
 "proposal" is that these become pinned negative tests upstream.
 **Target:** `aql-lang/aql` engine (dispatch, scope cleanup).
 **Provenance:** surfaced while building the `aless`

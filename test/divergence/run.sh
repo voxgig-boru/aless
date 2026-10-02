@@ -60,6 +60,8 @@ test/aless_doc_prop_test.aql
 test/aless_nav_unit_test.aql
 test/aless_tabs_unit_test.aql
 test/aless_app_unit_test.aql
+test/aless_app_browse_unit_test.aql
+test/aless_app_watch_unit_test.aql
 test/aless_smoke_test.aql
 "
 
@@ -112,17 +114,17 @@ check_errors() {
 
 # --- modules: check only ----------------------------------------------------
 log "modules — boru check must report 0 errors:"
-printf '  %-28s  %s\n' MODULE CHECK
+printf '  %-32s  %s\n' MODULE CHECK
 for m in $MODULES; do
   errs="$(check_errors "$m")"
   if [ "$errs" = 0 ]; then c_col="ok"; else c_col="FAIL($errs err)"; fail=1; fi
-  printf '  %-28s  %s\n' "$m" "$c_col"
+  printf '  %-32s  %s\n' "$m" "$c_col"
 done
 echo
 
 # --- suites: run (compiled) + check -----------------------------------------
 log "suites — boru X must exit 0 (and print \`all green\` where asserted); boru check X must report 0 errors:"
-printf '  %-28s  %-22s  %-12s  %s\n' SUITE RUN CHECK SECS
+printf '  %-32s  %-22s  %-12s  %s\n' SUITE RUN CHECK SECS
 for s in $SUITES; do
   name="$(basename "$s")"
 
@@ -143,7 +145,7 @@ for s in $SUITES; do
   errs="$(check_errors "$s")"
   if [ "$errs" = 0 ]; then c_col="ok"; else c_col="FAIL($errs err)"; fail=1; fi
 
-  printf '  %-28s  %-22s  %-12s  %s\n' "$name" "$r_col" "$c_col" "$secs"
+  printf '  %-32s  %-22s  %-12s  %s\n' "$name" "$r_col" "$c_col" "$secs"
   if [ "$r_col" != ok ]; then
     printf '%s\n' "$out" | grep -E 'error|FAIL|compile_failed' | head -5 | sed 's/^/      /'
   fi
