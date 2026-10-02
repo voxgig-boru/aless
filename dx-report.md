@@ -94,8 +94,9 @@ lines unchanged; multi-event sequences go through one fold (`_keys st
 ["j" "J" "l"]`, `_line st ":" "open …"` — the same events as the nested
 `_key`/`_type` calls, analysed once per call instead of once per event);
 and the two common starting states (`_booted`, `_json`) are built once
-at top level (app states are immutable maps). Measured peaks: 300k, 360k
-and 350k steps. Remove the split when upstream reports or lifts the
+at top level (app states are immutable maps). Measured peaks: 330k, 390k
+and 370k steps (with item D's lambdas in the app map) — about a fifth
+of the budget spare in the fullest suite. Remove the split when upstream reports or lifts the
 budget. Repro: the pre-split suite (`git show e218c33~1:test/aless_app_unit_test.aql`)
 under `boru`, against the same file under a build with
 `DefaultCheckStepBudget = 5_000_000`.

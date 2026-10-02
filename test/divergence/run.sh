@@ -27,7 +27,10 @@
 # against the WORKING DIRECTORY, so everything runs from the repo root.
 #
 # The launcher `aless.aql` is check-only here: running it starts the TUI,
-# which needs a terminal (see the PTY smoke in README.md).
+# which needs a terminal (see the PTY smoke in README.md). The live
+# Tui.run path compiles its callbacks lazily, apart from the suites'
+# whole-program compile, so it needs that PTY smoke too (dx-report,
+# "Migration to boru main @ 64c5ab2", item D).
 #
 # The harness builds its OWN boru at boru-lang/boru main HEAD (resolved at
 # run time, cached by SHA under ~/.cache/aless-divergence), so it never

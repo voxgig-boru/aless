@@ -17,7 +17,12 @@ BORU_REF=<sha> test/divergence/run.sh                # pin a specific boru commi
 | check | `boru check <file>` | report **0 errors**, on every suite **and** every module (`aless.aql` launcher included) |
 
 The launcher is check-only: running it starts the TUI, which needs a
-terminal — see the PTY smoke in the top-level `README.md`.
+terminal — see the PTY smoke in the top-level `README.md`. The gate
+cannot see the live `Tui.run` path, which compiles its callbacks lazily
+and apart from the suites' whole-program compile (a defect only that
+path hits once crashed the viewer with every suite green —
+`dx-report.md`, "Migration to boru main @ 64c5ab2", item D), so
+PTY-smoke any change to the app map or the update path.
 
 Everything runs **from the repo root**: suites import the modules
 file-relatively (`import "../aless-doc.aql"`), but the fixtures they read

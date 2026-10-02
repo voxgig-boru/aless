@@ -25,9 +25,11 @@ map.
 - **One execution path.** `boru X` runs a static pre-flight check, then
   compiles the program to bytecode and runs it on the VM — or fails with
   `[boru/compile_failed] … this is a compiler defect`. There is no
-  interpreter fallback, and `--compile` / `--force-compile` /
-  `--no-compile` are retired (usage errors). "A suite runs" therefore
-  means "a suite fully compiles". Never use `-no-check` to get green.
+  interpreter fallback for a program (a runtime callback without a
+  compiled unit still gets one — dx-report item D), and `--compile` /
+  `--force-compile` / `--no-compile` are retired (usage errors). "A suite
+  runs" therefore means "a suite fully compiles". Never use `-no-check`
+  to get green.
 - **Modules live at the repo root** (no subfolders): `aless.aql` is the
   entry launcher; `aless-app.aql` is the `Tui.run` shell (the only module
   that touches the terminal); `aless-{view,nav,tabs,doc,fmt}.aql` are the
