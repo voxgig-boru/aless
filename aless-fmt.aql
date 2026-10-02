@@ -8,7 +8,7 @@
 #                                      | {ok: false, err, code, kind}
 #   AlessFmt.kinds               → Map      the extension → kind table
 #
-# Parsing itself is delegated to aql's `IO.read`, which infers the
+# Parsing itself is delegated to boru's `IO.read`, which infers the
 # format from the file extension (csv, tsv, json, jsonic, json5,
 # jsonc, toml, yaml, xml, ini, zon, markdown, feed, …) and returns
 # structured data — or the raw text for unmapped extensions. An
@@ -27,7 +27,7 @@ import "boru:string-util"
 
 # --- extension → kind ------------------------------------------------
 #
-# Mirrors the DefaultExtensions table inside aql's IO.read (fileio.go).
+# Mirrors the DefaultExtensions table inside boru's IO.read (fileio.go).
 # Only used for labels and the kind override check — the actual parse
 # dispatch is IO.read's own inference, so drift here is cosmetic.
 

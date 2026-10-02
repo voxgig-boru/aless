@@ -1,14 +1,14 @@
-# aless — an aql file viewer (jless-style), with tabs and file watching.
+# aless — a boru file viewer (jless-style), with tabs and file watching.
 #
-# Launch from the repo root:
-#   aql aless.aql                # welcome tab; open files with :open
+# Launch (from any directory — the launcher's own imports resolve against
+# this file's directory; file arguments resolve against the working
+# directory, like any CLI):
+#   boru aless.aql                    # welcome tab; open files with :open
+#   boru aless.aql notes.json data.csv
 #
-# On an aql with the IO.args word (proposals/script-argv-and-env.md),
-# files can be passed straight from the shell:
-#   aql aless.aql notes.json data.csv
-# On builds without it, IO.args is absent and this falls back to the
-# welcome tab (open files with :open, or use the -e form):
-#   aql -e 'import "./aless-app.aql"  Aless.run {files: ["test/fixtures/sample.json"]}'
+# Files arrive through IO.args (proposals/script-argv-and-env.md, now on
+# boru main). The `do … error` guard keeps the launcher usable on a host
+# that runs it without argv: it falls back to the welcome tab.
 #
 # Full keymap: press ? inside, or see README.md.
 
