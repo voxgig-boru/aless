@@ -4,8 +4,8 @@
 #   aql test/aless_doc_unit_test.aql
 
 
-import "aql:test" end
-import "./aless-doc.aql" end
+import "boru:test" end
+import "../aless-doc.aql" end
 
 
 # Fixture documents, at top level (aql check treats test bodies as

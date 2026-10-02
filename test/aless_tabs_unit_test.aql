@@ -5,10 +5,10 @@
 #   aql test/aless_tabs_unit_test.aql
 
 
-import "aql:test" end
-import "./aless-doc.aql" end
-import "./aless-nav.aql" end
-import "./aless-tabs.aql" end
+import "boru:test" end
+import "../aless-doc.aql" end
+import "../aless-nav.aql" end
+import "../aless-tabs.aql" end
 
 
 def _vh 5

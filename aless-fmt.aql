@@ -21,8 +21,8 @@
 # can load "successfully" with partial content.
 
 
-import "aql:io"
-import "aql:string-util"
+import "boru:io"
+import "boru:string-util"
 
 
 # --- extension → kind ------------------------------------------------
@@ -128,7 +128,7 @@ def load-file fn [
 
 
 export "AlessFmt" {
-  kind-of: kind-of/r
-  load: load-file/r
+  kind-of: kind-of/v
+  load: load-file/v
   kinds: ext-kind-map
 }

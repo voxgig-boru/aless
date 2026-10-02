@@ -29,7 +29,7 @@
 # events not handled here return the tab unchanged.
 
 
-import "aql:math-util"
+import "boru:math-util"
 import "./aless-doc.aql"
 
 
@@ -352,7 +352,7 @@ def nav-key fn [
 
 
 export "AlessNav" {
-  key: nav-key/r
-  follow: follow/r
-  index-of: index-of/r
+  key: nav-key/v
+  follow: follow/v
+  index-of: index-of/v
 }

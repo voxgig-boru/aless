@@ -4,9 +4,9 @@
 #   aql test/aless_nav_unit_test.aql
 
 
-import "aql:test" end
-import "./aless-doc.aql" end
-import "./aless-nav.aql" end
+import "boru:test" end
+import "../aless-doc.aql" end
+import "../aless-nav.aql" end
 
 
 def _doc {a: {b: {c: [1, 2]}, d: true}, e: "s", f: [10, 20, 30]}

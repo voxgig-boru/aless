@@ -6,8 +6,8 @@
 #   aql test/aless_doc_prop_test.aql
 
 
-import "aql:test" end
-import "./aless-doc.aql" end
+import "boru:test" end
+import "../aless-doc.aql" end
 
 
 # A fixture with maps, lists, nesting, and scalars in all positions.

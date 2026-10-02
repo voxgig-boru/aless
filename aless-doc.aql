@@ -44,8 +44,8 @@
 # map children display in sorted-key order, not source order.
 
 
-import "aql:string-util"
-import "aql:struct-util"
+import "boru:string-util"
+import "boru:struct-util"
 
 
 # --- node inspection -------------------------------------------------
@@ -323,19 +323,19 @@ def search fn [
 
 
 export "AlessDoc" {
-  top: top/r
-  kids: kids/r
-  expand: expand/r
-  collapse: collapse/r
-  subtree-end: subtree-end/r
-  rebuild: rebuild/r
-  expanded-of: expanded-of/r
-  value-at: value-at/r
-  has-path: has-path/r
-  parent: parent/r
-  path-key: path-key/r
-  path-str: path-str/r
-  key-str: key-str/r
-  value-str: value-str/r
-  search: search/r
+  top: top/v
+  kids: kids/v
+  expand: expand/v
+  collapse: collapse/v
+  subtree-end: subtree-end/v
+  rebuild: rebuild/v
+  expanded-of: expanded-of/v
+  value-at: value-at/v
+  has-path: has-path/v
+  parent: parent/v
+  path-key: path-key/v
+  path-str: path-str/v
+  key-str: key-str/v
+  value-str: value-str/v
+  search: search/v
 }

@@ -4,8 +4,8 @@
 #   aql test/aless_fmt_unit_test.aql
 
 
-import "aql:test" end
-import "./aless-fmt.aql" end
+import "boru:test" end
+import "../aless-fmt.aql" end
 
 
 # --- kind-of: extension mapping ------------------------------------

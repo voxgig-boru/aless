@@ -6,8 +6,8 @@
 #   aql test/aless_smoke_test.aql
 
 
-import "./aless-fmt.aql" end
-import "./aless-doc.aql" end
+import "../aless-fmt.aql" end
+import "../aless-doc.aql" end
 
 
 print "--- aless viewer smoke: load + rows for every fixture ---"

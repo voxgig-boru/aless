@@ -12,7 +12,7 @@
 #
 # Full keymap: press ? inside, or see README.md.
 
-import "aql:io"
+import "boru:io"
 import "./aless-app.aql"
 
 def _cli-files (do [ IO.args ] error [ drop [] ])

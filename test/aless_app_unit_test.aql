@@ -12,12 +12,12 @@
 #   aql test/aless_app_unit_test.aql
 
 
-import "aql:test" end
-import "aql:io" end
-import "aql:string-util" end
-import "./aless-app.aql" end
-import "./aless-tabs.aql" end
-import "./aless-view.aql" end
+import "boru:test" end
+import "boru:io" end
+import "boru:string-util" end
+import "../aless-app.aql" end
+import "../aless-tabs.aql" end
+import "../aless-view.aql" end
 
 
 def _tmp-path "test/fixtures/.tmp-aless-app-watch.json"

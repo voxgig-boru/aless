@@ -32,11 +32,11 @@
 # can only reference MODULE-LEVEL words, never fn locals.
 
 
-import "aql:tui"
-import "aql:io"
-import "aql:time-util"
-import "aql:math-util"
-import "aql:string-util"
+import "boru:tui"
+import "boru:io"
+import "boru:time-util"
+import "boru:math-util"
+import "boru:string-util"
 import "./aless-fmt.aql"
 import "./aless-doc.aql"
 import "./aless-nav.aql"
@@ -424,7 +424,7 @@ def aless-app fn [
     }
     def s1 (fold [ var [[f acc] (AlessTabs.open (acc) (as-str (f)) {}) ]] (files) (s0))
     def s2 (if ((size (s1 get "tabs")) eq 0) [ open-welcome (s1) ] [ (s1) ])
-    def out { init: (s2), update: aless-update/r, view: aless-render/r }
+    def out { init: (s2), update: aless-update/v, view: aless-render/v }
     out
   ]
 ]
@@ -453,8 +453,8 @@ def aless-serve fn [
 
 
 export "Aless" {
-  app: aless-app/r
-  feed: feed/r
-  run: aless-run/r
-  serve: aless-serve/r
+  app: aless-app/v
+  feed: feed/v
+  run: aless-run/v
+  serve: aless-serve/v
 }
